@@ -32,7 +32,7 @@ Loven ble vedtatt med 95 mot 74 stemmer etter en lang debatt.</p>
 
 def test_tools_are_importable():
     """Verify all tools can be imported from the tools package."""
-    from src.tools import fetch_rss, fetch_webpage, extract_content, get_dedup_context, write_to_s3
+    from tools import fetch_rss, fetch_webpage, extract_content, get_dedup_context, write_to_s3
 
     assert callable(fetch_rss)
     assert callable(fetch_webpage)
@@ -43,11 +43,11 @@ def test_tools_are_importable():
 
 def test_full_pipeline_tools_integration(mock_rss_response, mock_article_html):
     """Test that tools work together in the expected pipeline sequence."""
-    from src.tools.rss_fetcher import fetch_rss
-    from src.tools.webpage_fetcher import fetch_webpage
-    from src.tools.content_extractor import extract_content
-    from src.tools.dedup import get_dedup_context
-    from src.tools.s3_writer import write_to_s3
+    from tools.rss_fetcher import fetch_rss
+    from tools.webpage_fetcher import fetch_webpage
+    from tools.content_extractor import extract_content
+    from tools.dedup import get_dedup_context
+    from tools.s3_writer import write_to_s3
 
     # Step 1: Get dedup context (none)
     dedup_result = get_dedup_context(dedup_config='{"type": "none"}')
@@ -56,14 +56,14 @@ def test_full_pipeline_tools_integration(mock_rss_response, mock_article_html):
 
     # Step 2: Fetch RSS
     now = datetime(2026, 5, 21, 10, 0, 0, tzinfo=timezone.utc)
-    with patch("src.tools.rss_fetcher.httpx") as mock_httpx:
+    with patch("tools.rss_fetcher.httpx") as mock_httpx:
         mock_resp = MagicMock()
         mock_resp.text = mock_rss_response
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
         mock_httpx.get.return_value = mock_resp
 
-        with patch("src.tools.rss_fetcher._now", return_value=now):
+        with patch("tools.rss_fetcher._now", return_value=now):
             rss_result = fetch_rss(url="https://nrk.no/rss", time_window_hours=6)
 
     assert rss_result["status"] == "success"
@@ -71,7 +71,7 @@ def test_full_pipeline_tools_integration(mock_rss_response, mock_article_html):
     article_url = rss_result["articles"][0]["url"]
 
     # Step 3: Fetch webpage
-    with patch("src.tools.webpage_fetcher.httpx") as mock_httpx:
+    with patch("tools.webpage_fetcher.httpx") as mock_httpx:
         mock_resp = MagicMock()
         mock_resp.text = mock_article_html
         mock_resp.status_code = 200
@@ -104,7 +104,7 @@ def test_full_pipeline_tools_integration(mock_rss_response, mock_article_html):
         }
     )
 
-    with patch("src.tools.s3_writer.boto3") as mock_boto3:
+    with patch("tools.s3_writer.boto3") as mock_boto3:
         mock_s3 = MagicMock()
         mock_boto3.client.return_value = mock_s3
 
@@ -120,8 +120,8 @@ def test_full_pipeline_tools_integration(mock_rss_response, mock_article_html):
 
 def test_dedup_filters_known_urls(mock_rss_response):
     """Test that articles with known URLs get filtered in the pipeline."""
-    from src.tools.rss_fetcher import fetch_rss
-    from src.tools.dedup import get_dedup_context
+    from tools.rss_fetcher import fetch_rss
+    from tools.dedup import get_dedup_context
 
     # Step 1: Dedup with known URL
     config = '{"type": "url_list", "urls": ["https://nrk.no/article/1"]}'
@@ -130,14 +130,14 @@ def test_dedup_filters_known_urls(mock_rss_response):
 
     # Step 2: Fetch RSS
     now = datetime(2026, 5, 21, 10, 0, 0, tzinfo=timezone.utc)
-    with patch("src.tools.rss_fetcher.httpx") as mock_httpx:
+    with patch("tools.rss_fetcher.httpx") as mock_httpx:
         mock_resp = MagicMock()
         mock_resp.text = mock_rss_response
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
         mock_httpx.get.return_value = mock_resp
 
-        with patch("src.tools.rss_fetcher._now", return_value=now):
+        with patch("tools.rss_fetcher._now", return_value=now):
             rss_result = fetch_rss(url="https://nrk.no/rss", time_window_hours=6)
 
     # Step 3: Filter by known URLs (this is what the agent would do)

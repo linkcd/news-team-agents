@@ -4,11 +4,11 @@ import pytest
 
 
 def test_fetch_webpage_returns_html_content():
-    from src.tools.webpage_fetcher import fetch_webpage
+    from tools.webpage_fetcher import fetch_webpage
 
     html = "<html><body><p>Hello world</p></body></html>"
 
-    with patch("src.tools.webpage_fetcher.httpx") as mock_httpx:
+    with patch("tools.webpage_fetcher.httpx") as mock_httpx:
         mock_response = MagicMock()
         mock_response.text = html
         mock_response.status_code = 200
@@ -23,9 +23,9 @@ def test_fetch_webpage_returns_html_content():
 
 
 def test_fetch_webpage_handles_timeout():
-    from src.tools.webpage_fetcher import fetch_webpage
+    from tools.webpage_fetcher import fetch_webpage
 
-    with patch("src.tools.webpage_fetcher.httpx") as mock_httpx:
+    with patch("tools.webpage_fetcher.httpx") as mock_httpx:
         mock_httpx.get.side_effect = Exception("Timeout")
 
         result = fetch_webpage(url="https://example.com/slow")
@@ -36,9 +36,9 @@ def test_fetch_webpage_handles_timeout():
 
 
 def test_fetch_webpage_handles_404():
-    from src.tools.webpage_fetcher import fetch_webpage
+    from tools.webpage_fetcher import fetch_webpage
 
-    with patch("src.tools.webpage_fetcher.httpx") as mock_httpx:
+    with patch("tools.webpage_fetcher.httpx") as mock_httpx:
         mock_response = MagicMock()
         mock_response.status_code = 404
         mock_response.raise_for_status.side_effect = Exception("404 Not Found")
