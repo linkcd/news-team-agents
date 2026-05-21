@@ -6,6 +6,11 @@ strands_mock = MagicMock()
 strands_mock.tool = lambda fn: fn  # @tool decorator is a passthrough
 sys.modules["strands"] = strands_mock
 
+# Stub out boto3 for testing (not installed in test environment)
+if "boto3" not in sys.modules:
+    boto3_mock = MagicMock()
+    sys.modules["boto3"] = boto3_mock
+
 import pytest
 
 
