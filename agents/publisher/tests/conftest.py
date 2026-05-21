@@ -21,6 +21,20 @@ if "git" not in sys.modules:
     git_mock = MagicMock()
     sys.modules["git"] = git_mock
 
+# Stub out bedrock_agentcore for testing
+# The @requires_api_key decorator injects an api_key kwarg — in tests we make it a no-op
+def _passthrough_decorator(**kwargs):
+    def decorator(func):
+        return func
+    return decorator
+
+bedrock_agentcore_mock = MagicMock()
+bedrock_agentcore_identity_mock = MagicMock()
+bedrock_agentcore_identity_mock.requires_api_key = _passthrough_decorator
+sys.modules["bedrock_agentcore"] = bedrock_agentcore_mock
+sys.modules["bedrock_agentcore.identity"] = bedrock_agentcore_identity_mock
+sys.modules["bedrock_agentcore.runtime"] = MagicMock()
+
 import pytest
 
 
