@@ -109,6 +109,8 @@ Return a JSON result with this structure:
 def create_agent() -> Agent:
     model = BedrockModel(model_id=MODEL_ID)
     return Agent(
+        name="NewsOrchestrator",
+        description="Workflow orchestrator for Norwegian news pipeline. Coordinates Collector and Publisher agents via A2A to produce daily Chinese-language news blog posts from Norwegian sources.",
         model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=[verify_agents, invoke_collector, invoke_publisher],

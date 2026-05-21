@@ -84,6 +84,8 @@ When generating a day summary (今日综述):
 def create_agent() -> Agent:
     model = BedrockModel(model_id=MODEL_ID)
     return Agent(
+        name="NewsPublisher",
+        description="General-purpose editorial and publishing agent. Formats content into blog posts, merges new content into existing posts, rewrites pages, and pushes changes to Git repositories.",
         model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=[read_from_s3, read_repo_file, format_post, merge_posts, git_clone, git_commit_and_push],
