@@ -111,6 +111,8 @@ Each updated_item:
 def create_agent() -> Agent:
     model = BedrockModel(model_id=MODEL_ID)
     return Agent(
+        name="NewsCollector",
+        description="General-purpose web content collection agent. Fetches RSS feeds and webpages, deduplicates by URL, consolidates related articles into topics, translates/summarizes, and writes structured JSON output to S3.",
         model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=[fetch_rss, fetch_webpage, extract_content, get_dedup_context, write_to_s3],
