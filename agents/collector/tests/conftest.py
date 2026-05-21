@@ -1,3 +1,11 @@
+import sys
+from unittest.mock import MagicMock
+
+# Stub out the strands module for testing (not available on PyPI)
+strands_mock = MagicMock()
+strands_mock.tool = lambda fn: fn  # @tool decorator is a passthrough
+sys.modules["strands"] = strands_mock
+
 import pytest
 
 
