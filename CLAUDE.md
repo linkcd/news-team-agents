@@ -202,3 +202,26 @@ agents/<name>/
 - **Model ID** uses global inference profile (`global.anthropic.claude-sonnet-4-6`) so it works regardless of which region the runtime deploys to.
 - **Tests import from `app/`** via `conftest.py` sys.path insertion. They mock `strands` and `boto3` since those aren't installed in the test environment.
 
+### Development Workflow (per agent)
+
+1. **Write tools** in `app/<AgentName>/tools/` using `@tool` decorator from `strands`
+2. **Write tests** in `tests/` — mock external deps, test tool input/output contracts
+3. **Run tests**: `python3 -m pytest tests/ -v`
+4. **Write agent.py** — system prompt guiding the LLM through the pipeline + register tools
+5. **Write main.py** — `BedrockAgentCoreApp` entrypoint that creates agent and streams response
+6. **Generate lock file**: `cd app/<AgentName> && uv lock`
+7. **Deploy**: `agentcore deploy -y` (builds container via CodeBuild, creates/updates runtime)
+8. **Verify**: `agentcore invoke '{"task": {...}}' --stream`
+
+### Agent Naming Map
+
+| Agent | Project Name | App Directory | Runtime Name |
+|-------|-------------|---------------|--------------|
+| Collector | `newscollector` | `app/NewsCollector/` | `NewsCollector` |
+| Publisher | `newspublisher` | `app/NewsPublisher/` | `NewsPublisher` |
+| Orchestrator | `newsorchestrator` | `app/NewsOrchestrator/` | `NewsOrchestrator` |
+
+### CDK Bootstrap
+
+The first `agentcore deploy` for a new agent requires CDK to be bootstrapped in the target account/region. The agentcore CLI handles this automatically. If the CDK `cdk/` directory doesn't exist yet, copy it from an existing agent (e.g., `agents/collector/agentcore/cdk/`) and run `npm install --legacy-peer-deps --cache /tmp/npm-cache` inside it.
+
