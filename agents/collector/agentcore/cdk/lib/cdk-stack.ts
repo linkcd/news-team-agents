@@ -4,7 +4,7 @@ import {
   type AgentCoreProjectSpec,
   type AgentCoreMcpSpec,
 } from '@aws/agentcore-cdk';
-import { CfnOutput, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Stack, type StackProps, aws_iam as iam } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 
 export interface AgentCoreStackProps extends StackProps {
@@ -51,6 +51,15 @@ export class AgentCoreStack extends Stack {
         credentials,
         projectTags: spec.tags,
       });
+    }
+
+    // Grant collector runtime S3 read/write access for the data bucket
+    const collectorEnv = this.application.environments.get('NewsCollector');
+    if (collectorEnv) {
+      collectorEnv.runtime.addToPolicy(new iam.PolicyStatement({
+        actions: ['s3:PutObject', 's3:GetObject'],
+        resources: ['arn:aws:s3:::news-agent-data-548129671048/*'],
+      }));
     }
 
     // Stack-level output
