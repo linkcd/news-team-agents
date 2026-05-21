@@ -1,0 +1,33 @@
+---
+title: 挪威新闻速递 {{ date }}
+date: {{ date }} {{ time }}
+updated: {{ date }} {{ updated_time }}
+tags: [挪威, 新闻]
+categories: [每日新闻, 挪威]
+---
+
+## 今日综述
+{{ day_summary }}
+
+<!-- more -->
+
+{% for section in sections %}
+## {{ section.title }}
+
+{% for item in section.entries %}
+### {{ item.number }}. {{ item.title_zh }}
+**来源**: {{ item.sources_text }} | **最早报道**: {{ item.earliest_time }}
+
+{{ item.summary_zh }}
+{% if item.changelog %}
+({{ item.changelog }})
+{% endif %}
+
+原文链接: {{ item.links_text }}
+
+---
+
+{% endfor %}
+{% endfor %}
+*新闻来源: {{ all_sources }}*
+*最后更新: {{ updated_time }} UTC*
