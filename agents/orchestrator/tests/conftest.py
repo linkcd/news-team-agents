@@ -8,11 +8,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app", "NewsOrc
 # Stub out the strands module for testing
 strands_mock = MagicMock()
 strands_mock.tool = lambda fn: fn
+strands_mock.a2a = MagicMock()
 sys.modules["strands"] = strands_mock
+sys.modules["strands.a2a"] = strands_mock.a2a
+sys.modules["strands.models"] = MagicMock()
 
-# Stub out boto3 for testing
-if "boto3" not in sys.modules:
-    boto3_mock = MagicMock()
-    sys.modules["boto3"] = boto3_mock
+# Stub out bedrock_agentcore for testing
+agentcore_mock = MagicMock()
+sys.modules["bedrock_agentcore"] = agentcore_mock
+sys.modules["bedrock_agentcore.runtime"] = agentcore_mock.runtime
+
+# Stub out boto3 for testing (not installed in test env)
+boto3_mock = MagicMock()
+sys.modules["boto3"] = boto3_mock
 
 import pytest

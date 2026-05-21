@@ -15,7 +15,7 @@
       "codeLocation": "app/NewsCollector/",
       "runtimeVersion": "PYTHON_3_12",
       "networkMode": "PUBLIC",
-      "protocol": "HTTP"
+      "protocol": "A2A"
     }
   ],
   "memories": [],
