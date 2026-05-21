@@ -20,7 +20,8 @@ Three independent AgentCore runtimes, each a standalone subfolder with its own s
 
 Communication: boto3 `invoke_agent_runtime` for control flow. S3 for bulk data passing between agents.
 Scheduling: EventBridge (every 6h: 05:00, 11:00, 17:00, 23:00 UTC) -> Lambda -> Orchestrator.
-Model: Claude Sonnet 4 via Amazon Bedrock.
+Model: Claude Sonnet 4 via Amazon Bedrock (global inference profile: `global.anthropic.claude-sonnet-4-6`).
+AWS Region: `eu-west-1` for all deployments.
 
 See `doc/architecture.md` for full system design.
 
@@ -100,6 +101,8 @@ news-agent/
 - AgentCore (Container build type)
 - CDK (Python) for infrastructure (per-agent, in each agent's `infra/`)
 - Libraries: feedparser, trafilatura, httpx, gitpython, jinja2
+- AWS Region: `eu-west-1` (all resources)
+- Model: `global.anthropic.claude-sonnet-4-6` (global inference profile, works in any region)
 - AWS: EventBridge, Lambda, S3, Secrets Manager, IAM
 - GitHub Actions for hexo deploy
 
