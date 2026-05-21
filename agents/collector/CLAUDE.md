@@ -2,6 +2,13 @@
 
 A general-purpose web content collection agent. Given a set of URLs (or RSS feed URLs) and configuration, it fetches content, extracts articles, consolidates related content into topics, and writes structured output to S3.
 
+## Deployment
+
+- **Runtime ID**: `newscollector_NewsCollector-dVHkI27O5j`
+- **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j`
+- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent))`
+- **Region**: eu-west-1
+
 ## Purpose
 
 Standalone, reusable agent for web content collection with intelligent consolidation. Any agent can invoke it with a collection task — not tied to any specific workflow or domain.
@@ -40,7 +47,9 @@ Run 2: Article E1 (Aftenposten) about parliament vote, no new info
 
 ## Interface
 
-### Input (via `invoke_agent_runtime` payload)
+Receives A2A `message/send` requests (JSON-RPC 2.0). The task config is passed as a `data` Part in the A2A message. Returns an A2A task with artifacts containing the result.
+
+### Input (task config delivered via A2A message Part)
 
 ```json
 {
@@ -229,7 +238,8 @@ The agent supports multiple dedup source types:
 
 ## Tech Stack
 
-- Python 3.11, Strands Agents SDK
+- Python 3.12, Strands Agents SDK (with A2A support)
+- bedrock-agentcore[a2a] (A2A runtime serving)
 - feedparser (RSS parsing)
 - trafilatura (article extraction)
 - httpx (HTTP client)
@@ -238,8 +248,10 @@ The agent supports multiple dedup source types:
 ## Development
 
 ```bash
-agentcore dev   # local development
-pytest tests/   # run unit tests
+agentcore dev                    # local development
+python3 -m pytest tests/ -v      # run unit tests (21 tests)
+agentcore deploy -y              # deploy to AWS
+agentcore invoke '{"task": {...}}' --stream  # invoke
 ```
 
 ## Article Extraction Strategy

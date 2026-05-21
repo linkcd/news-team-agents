@@ -18,7 +18,7 @@ Three independent AgentCore runtimes, each a standalone subfolder with its own s
 
 4. **GitHub Action** (in hexo-blog repo) - Triggers on push, runs hexo deploy to GitHub Pages.
 
-Communication: boto3 `invoke_agent_runtime` for control flow. S3 for bulk data passing between agents.
+Communication: A2A protocol (Agent-to-Agent) over boto3 `invoke_agent_runtime` with SigV4 auth. JSON-RPC 2.0 `message/send` for control flow. S3 for bulk data passing between agents.
 Scheduling: EventBridge (every 6h: 05:00, 11:00, 17:00, 23:00 UTC) -> Lambda -> Orchestrator.
 Model: Claude Sonnet 4 via Amazon Bedrock (global inference profile: `global.anthropic.claude-sonnet-4-6`).
 AWS Region: `eu-west-1` for all deployments.
@@ -88,8 +88,9 @@ news-agent/
 
 ## Tech Stack
 
-- Python 3.11, Strands Agents SDK
-- AgentCore (Container build type)
+- Python 3.12, Strands Agents SDK
+- AgentCore (Container build type, A2A protocol)
+- A2A protocol (Agent-to-Agent, v1.0) via `bedrock-agentcore[a2a]` + `strands-agents[a2a]`
 - CDK (TypeScript, managed by agentcore CLI) for infrastructure
 - Libraries: feedparser, trafilatura, httpx, gitpython, jinja2
 - AWS Region: `eu-west-1` (all resources)
@@ -121,23 +122,24 @@ All implementation MUST follow TDD. No exceptions.
 ```
 agents/collector/tests/
   test_dedup.py              # Dedup source reading + URL extraction
-  test_rss_fetcher.py        # RSS parsing + time filtering (src/tools/)
-  test_content_extractor.py  # Article extraction + failure handling (src/tools/)
-  test_consolidation.py      # Topic grouping + matching + "new info?" judgment
-  test_s3_writer.py          # Output format + S3 write (src/tools/)
+  test_rss_fetcher.py        # RSS parsing + time filtering
+  test_content_extractor.py  # Article extraction + failure handling
+  test_webpage_fetcher.py    # HTTP fetch + error handling
+  test_s3_writer.py          # Output format + S3 write
   test_agent_e2e.py          # Full agent flow with mocked externals
 
 agents/publisher/tests/
-  test_formatter.py          # Jinja2 template rendering (src/templates/)
-  test_merger.py             # Deterministic merge logic (src/tools/)
-  test_git_operations.py     # Git clone/commit/push (src/tools/)
-  test_s3_reader.py          # S3 read + parse (src/tools/)
+  test_formatter.py          # Jinja2 template rendering
+  test_merger.py             # Deterministic merge logic
+  test_git_ops.py            # Git clone/commit/push
+  test_s3_reader.py          # S3 read + parse
+  test_repo_reader.py        # GitHub file reading
   test_agent_e2e.py          # Full agent flow with mocked externals
 
 agents/orchestrator/tests/
-  test_task_config.py        # Correct config building (src/config.py)
-  test_workflow.py           # Retry/skip/publish decisions
-  test_agent_e2e.py          # Full orchestration with mocked agent calls
+  test_invoke_collector.py   # A2A invocation of Collector agent
+  test_invoke_publisher.py   # A2A invocation of Publisher agent
+  test_agent_e2e.py          # Full orchestration + config validation
 ```
 
 ## Development Commands
@@ -167,10 +169,11 @@ pytest tests/
 
 ## Implementation Status
 
-- **Collector**: Deployed and verified in eu-west-1. Runtime ID: `newscollector_NewsCollector-dVHkI27O5j`
-- **Publisher**: Not started
-- **Orchestrator**: Not started
+- **Collector**: Deployed (A2A). Runtime ID: `newscollector_NewsCollector-dVHkI27O5j`
+- **Publisher**: Deployed (A2A). Runtime ID: `newspublisher_NewsPublisher-jF5YE229x9`
+- **Orchestrator**: Deployed (A2A). Runtime ID: `newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
 - **S3 bucket**: `news-agent-data-548129671048` (eu-west-1, 7-day lifecycle)
+- **All agents**: Using A2A protocol with `serve_a2a(StrandsA2AExecutor(agent))`
 
 ## AgentCore Project Layout
 
@@ -183,7 +186,7 @@ agents/<name>/
 │   ├── aws-targets.json        # Deployment targets [{name, account, region}]
 │   └── cdk/                    # CDK stack (TypeScript) — do NOT modify manually
 ├── app/<AgentName>/            # Production code (this gets containerized)
-│   ├── main.py                 # Entrypoint: BedrockAgentCoreApp + @app.entrypoint
+│   ├── main.py                 # Entrypoint: serve_a2a(StrandsA2AExecutor(agent))
 │   ├── agent.py                # Agent factory: system prompt + tools
 │   ├── config.py               # MODEL_ID, constants (env var overridable)
 │   ├── tools/                  # @tool decorated functions
@@ -208,7 +211,7 @@ agents/<name>/
 2. **Write tests** in `tests/` — mock external deps, test tool input/output contracts
 3. **Run tests**: `python3 -m pytest tests/ -v`
 4. **Write agent.py** — system prompt guiding the LLM through the pipeline + register tools
-5. **Write main.py** — `BedrockAgentCoreApp` entrypoint that creates agent and streams response
+5. **Write main.py** — `serve_a2a(StrandsA2AExecutor(agent))` entrypoint
 6. **Generate lock file**: `cd app/<AgentName> && uv lock`
 7. **Deploy**: `agentcore deploy -y` (builds container via CodeBuild, creates/updates runtime)
 8. **Verify**: `agentcore invoke '{"task": {...}}' --stream`

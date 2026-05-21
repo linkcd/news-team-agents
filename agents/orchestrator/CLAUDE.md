@@ -1,6 +1,6 @@
 # Orchestrator Agent
 
-Workflow coordination agent for the Norwegian news collection and publishing pipeline. Manages the Collector and Publisher agents as a swarm to produce daily news blog posts.
+Workflow coordination agent for the Norwegian news collection and publishing pipeline. Manages the Collector and Publisher agents via A2A protocol to produce daily news blog posts.
 
 ## Purpose
 
@@ -8,9 +8,18 @@ Domain-specific orchestration agent. Coordinates the news collection workflow by
 
 This agent is NOT general-purpose — it encodes the specific business logic for the Norwegian news pipeline (sources, schedule awareness, quality decisions).
 
+## Deployment
+
+- **Runtime ID**: `newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
+- **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
+- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent))`
+- **Region**: eu-west-1
+
 ## Interface
 
-### Input (via `invoke_agent_runtime` payload from Lambda)
+Receives A2A `message/send` requests (JSON-RPC 2.0). The trigger event is passed as a `data` Part. Returns an A2A task with artifacts containing the run result.
+
+### Input (trigger event delivered via A2A message Part, from Lambda)
 
 ```json
 {
@@ -137,14 +146,18 @@ Blog target:
 
 | Tool | Purpose |
 |------|---------|
-| `invoke_collector(task_config)` | Calls Collector runtime via boto3 `invoke_agent_runtime` |
-| `invoke_publisher(task_config)` | Calls Publisher runtime via boto3 `invoke_agent_runtime` |
+| `invoke_collector(task_config)` | Sends A2A `message/send` to Collector via boto3 `invoke_agent_runtime`. Parses A2A task response (artifacts/status). |
+| `invoke_publisher(task_config)` | Sends A2A `message/send` to Publisher via boto3 `invoke_agent_runtime`. Parses A2A task response (artifacts/status). |
+
+Both tools construct a JSON-RPC 2.0 `message/send` payload wrapping the task config as an A2A data Part, invoke the target runtime with SigV4 auth, and parse the A2A response (completed/failed status + artifact data).
 
 ## Environment Variables
 
-- `COLLECTOR_ARN` - ARN of the Collector AgentCore runtime
-- `PUBLISHER_ARN` - ARN of the Publisher AgentCore runtime
+- `COLLECTOR_RUNTIME_ARN` - ARN of the Collector AgentCore runtime
+- `PUBLISHER_RUNTIME_ARN` - ARN of the Publisher AgentCore runtime
 - `S3_BUCKET` - Name of the intermediate data bucket
+- `AWS_REGION` - AWS region (default: eu-west-1)
+- `MODEL_ID` - Bedrock model ID (default: global.anthropic.claude-sonnet-4-6)
 
 ## IAM Permissions Required
 
@@ -160,8 +173,10 @@ Blog target:
 ## Development
 
 ```bash
-agentcore dev   # local development (requires Collector + Publisher to be deployed or mocked)
-pytest tests/   # run unit tests
+agentcore dev                    # local development (requires Collector + Publisher to be deployed)
+python3 -m pytest tests/ -v      # run unit tests (20 tests)
+agentcore deploy -y              # deploy to AWS
+agentcore invoke '{"trigger": "scheduled", "run_time": "2026-05-21T11:00:00Z"}' --stream  # invoke
 ```
 
 ## What This Agent Does NOT Do

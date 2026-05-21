@@ -2,13 +2,22 @@
 
 A general-purpose editorial and publishing agent. Given content (from S3 or direct input), it can format, rewrite, merge, and publish to a Git-based blog or any target repository. Any agent can invoke it for editorial tasks.
 
+## Deployment
+
+- **Runtime ID**: `newspublisher_NewsPublisher-jF5YE229x9`
+- **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9`
+- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent))`
+- **Region**: eu-west-1
+
 ## Purpose
 
 Standalone, reusable agent for content editing and publishing. Handles: formatting content into blog posts, rewriting/editing existing pages, merging new content into existing posts (including topic updates), and pushing changes to Git repos. Not tied to any specific workflow.
 
 ## Interface
 
-### Input (via `invoke_agent_runtime` payload)
+Receives A2A `message/send` requests (JSON-RPC 2.0). The task config is passed as a `data` Part in the A2A message. Returns an A2A task with artifacts containing the result.
+
+### Input (task config delivered via A2A message Part)
 
 The agent accepts multiple task types:
 
@@ -248,7 +257,8 @@ New templates can be added for new use cases without changing agent code.
 
 ## Tech Stack
 
-- Python 3.11, Strands Agents SDK
+- Python 3.12, Strands Agents SDK (with A2A support)
+- bedrock-agentcore[a2a] (A2A runtime serving)
 - gitpython (git operations)
 - jinja2 (template rendering)
 - boto3 (S3 reads, Secrets Manager)
@@ -257,8 +267,10 @@ New templates can be added for new use cases without changing agent code.
 ## Development
 
 ```bash
-agentcore dev   # local development
-pytest tests/   # run unit tests
+agentcore dev                    # local development
+python3 -m pytest tests/ -v      # run unit tests (19 tests)
+agentcore deploy -y              # deploy to AWS
+agentcore invoke '{"task": {...}}' --stream  # invoke
 ```
 
 ## Design Principles
