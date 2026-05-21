@@ -100,7 +100,50 @@ news-agent/
 - AWS: EventBridge, Lambda, S3, Secrets Manager, IAM
 - GitHub Actions for hexo deploy
 
-## Development
+## Development Methodology: Test-Driven Development (TDD)
+
+All implementation MUST follow TDD. No exceptions.
+
+### The Cycle
+1. **Write a failing test first** — define the expected behavior before writing any implementation code
+2. **Run the test, confirm it fails** — verify the test is actually testing something
+3. **Write the minimum implementation** to make the test pass
+4. **Run the test, confirm it passes**
+5. **Refactor** if needed (tests must still pass)
+6. **Repeat** for the next behavior
+
+### Rules
+- Never write implementation code without a failing test that demands it
+- Tests go in each agent's `tests/` directory (unit) or root `tests/` (integration)
+- Use pytest as the test framework
+- Mock external dependencies (S3, GitHub API, RSS feeds, LLM calls) in unit tests
+- Each tool gets its own test file (e.g., `tests/test_rss_fetcher.py`)
+- Test the interface contract (input → output) not internal implementation details
+
+### Test Structure Per Agent
+```
+agents/collector/tests/
+  test_dedup.py              # Dedup source reading + URL extraction
+  test_rss_fetcher.py        # RSS parsing + time filtering
+  test_content_extractor.py  # Article extraction + failure handling
+  test_consolidation.py      # Topic grouping + matching + "new info?" judgment
+  test_s3_writer.py          # Output format + S3 write
+  test_agent_e2e.py          # Full agent flow with mocked externals
+
+agents/publisher/tests/
+  test_formatter.py          # Jinja2 template rendering
+  test_merger.py             # Deterministic merge logic
+  test_git_operations.py     # Git clone/commit/push
+  test_s3_reader.py          # S3 read + parse
+  test_agent_e2e.py          # Full agent flow with mocked externals
+
+agents/orchestrator/tests/
+  test_task_config.py        # Correct config building
+  test_workflow.py           # Retry/skip/publish decisions
+  test_agent_e2e.py          # Full orchestration with mocked agent calls
+```
+
+## Development Commands
 
 ```bash
 # Local development (per agent)
