@@ -1,16 +1,18 @@
 import os
 import tempfile
 
-import boto3
 import git
+from bedrock_agentcore.identity import requires_api_key
 from strands import tool
 
 
-def _get_github_token() -> str:
-    """Retrieve GitHub token from Secrets Manager."""
-    client = boto3.client("secretsmanager")
-    response = client.get_secret_value(SecretId="news-agent/github-token")
-    return response["SecretString"]
+@requires_api_key(provider_name="github-token", into="api_key")
+def _clone_with_token(repo: str, branch: str, api_key: str = "") -> dict:
+    """Clone a repo using the injected API key as the GitHub token."""
+    clone_url = f"https://{api_key}@github.com/{repo}.git"
+    repo_path = tempfile.mkdtemp(prefix="publisher_")
+    git.Repo.clone_from(clone_url, repo_path, branch=branch)
+    return {"status": "success", "repo_path": repo_path}
 
 
 @tool
@@ -25,11 +27,7 @@ def git_clone(repo: str, branch: str) -> dict:
         Dict with status, repo_path (local path to cloned repo), and error if any
     """
     try:
-        token = _get_github_token()
-        clone_url = f"https://{token}@github.com/{repo}.git"
-        repo_path = tempfile.mkdtemp(prefix="publisher_")
-        git.Repo.clone_from(clone_url, repo_path, branch=branch)
-        return {"status": "success", "repo_path": repo_path}
+        return _clone_with_token(repo=repo, branch=branch)
     except Exception as e:
         return {"status": "error", "error": str(e), "repo_path": ""}
 

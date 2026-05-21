@@ -58,10 +58,9 @@ def test_publish_new_flow_integration(sample_collection_data):
     assert "## 财经新闻" in format_result["content"]
 
     # Step 3: Git clone
-    with patch("tools.git_ops.git.Repo") as MockRepo:
-        MockRepo.clone_from.return_value = MagicMock()
-        with patch("tools.git_ops._get_github_token", return_value="ghp_test"):
-            clone_result = git_clone(repo="claw-lu/hexo-blog", branch="main")
+    with patch("tools.git_ops._clone_with_token") as mock_clone:
+        mock_clone.return_value = {"status": "success", "repo_path": "/tmp/publisher_test"}
+        clone_result = git_clone(repo="claw-lu/hexo-blog", branch="main")
 
     assert clone_result["status"] == "success"
 

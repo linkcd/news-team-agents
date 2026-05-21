@@ -11,8 +11,33 @@ def test_git_clone_clones_repo_to_temp_dir():
         mock_repo = MagicMock()
         MockRepo.clone_from.return_value = mock_repo
 
-        with patch("tools.git_ops._get_github_token", return_value="ghp_test123"):
+        with patch("tools.git_ops._clone_with_token") as mock_clone:
+            mock_clone.return_value = {"status": "success", "repo_path": "/tmp/publisher_abc"}
             result = git_clone(repo="claw-lu/hexo-blog", branch="main")
+
+    assert result["status"] == "success"
+    assert result["repo_path"] == "/tmp/publisher_abc"
+    mock_clone.assert_called_once_with(repo="claw-lu/hexo-blog", branch="main")
+
+
+def test_git_clone_handles_clone_failure():
+    from tools.git_ops import git_clone
+
+    with patch("tools.git_ops._clone_with_token") as mock_clone:
+        mock_clone.side_effect = Exception("Authentication failed")
+        result = git_clone(repo="claw-lu/hexo-blog", branch="main")
+
+    assert result["status"] == "error"
+    assert "Authentication failed" in result["error"]
+
+
+def test_clone_with_token_uses_token_in_url():
+    from tools.git_ops import _clone_with_token
+
+    with patch("tools.git_ops.git.Repo") as MockRepo:
+        MockRepo.clone_from.return_value = MagicMock()
+
+        result = _clone_with_token(repo="claw-lu/hexo-blog", branch="main", api_key="ghp_test123")
 
     assert result["status"] == "success"
     assert result["repo_path"] != ""
@@ -20,18 +45,6 @@ def test_git_clone_clones_repo_to_temp_dir():
     clone_url = MockRepo.clone_from.call_args[0][0]
     assert "ghp_test123" in clone_url
     assert "claw-lu/hexo-blog" in clone_url
-
-
-def test_git_clone_handles_clone_failure():
-    from tools.git_ops import git_clone
-
-    with patch("tools.git_ops.git.Repo") as MockRepo:
-        MockRepo.clone_from.side_effect = Exception("Authentication failed")
-        with patch("tools.git_ops._get_github_token", return_value="ghp_bad"):
-            result = git_clone(repo="claw-lu/hexo-blog", branch="main")
-
-    assert result["status"] == "error"
-    assert "Authentication failed" in result["error"]
 
 
 def test_git_commit_and_push_writes_and_pushes():
@@ -80,7 +93,6 @@ def test_git_commit_and_push_writes_file_content():
                 commit_message="test",
             )
 
-        # File should be written to disk
         full_path = os.path.join(tmpdir, file_path)
         assert os.path.exists(full_path)
         with open(full_path) as f:

@@ -53,18 +53,18 @@ export class AgentCoreStack extends Stack {
       });
     }
 
-    // Grant publisher runtime permissions for S3 and Secrets Manager
+    // Grant publisher runtime additional IAM permissions
     const publisherEnv = this.application.environments.get('NewsPublisher');
     if (publisherEnv) {
+      // S3 read access for reading collected content from the data bucket
       publisherEnv.runtime.addToPolicy(new iam.PolicyStatement({
         actions: ['s3:GetObject'],
         resources: ['arn:aws:s3:::news-agent-data-548129671048/*'],
       }));
-      publisherEnv.runtime.addToPolicy(new iam.PolicyStatement({
-        actions: ['secretsmanager:GetSecretValue'],
-        resources: ['arn:aws:secretsmanager:eu-west-1:548129671048:secret:news-agent/github-token*'],
-      }));
     }
+    // Note: AgentCore Identity credentials (github-token ApiKeyCredentialProvider)
+    // are automatically wired by AgentCoreApplication.wireCredentialsToAgents()
+    // which grants bedrock-agentcore:GetApiKeyCredential and related permissions.
 
     // Stack-level output
     new CfnOutput(this, 'StackNameOutput', {
