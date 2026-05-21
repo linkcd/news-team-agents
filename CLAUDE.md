@@ -8,13 +8,13 @@ Collects Norwegian news from RSS feeds every 6 hours, translates/summarizes to C
 
 ## Architecture
 
-Three independent AgentCore runtimes organized as microservices:
+Three independent AgentCore runtimes, each a standalone subfolder with its own source, infrastructure, and tests:
 
 1. **Collector** (`agents/collector/`) - General-purpose web content collection. Given URLs + config, fetches content, extracts articles, processes them (translate/summarize), writes structured output to S3. Reusable by any agent for any collection task.
 
 2. **Publisher** (`agents/publisher/`) - General-purpose editorial and publishing agent. Formats content into blog posts, rewrites pages, merges new content into existing posts, pushes to Git. Reusable by any agent for any editorial task.
 
-3. **Orchestrator** (`agents/orchestrator/`) - Domain-specific workflow coordinator for Norwegian news. Invokes Collector and Publisher with the right parameters, handles retry, makes run-level decisions.
+3. **Orchestrator** (`agents/orchestrator/`) - Domain-specific workflow coordinator for Norwegian news. Invokes Collector and Publisher with the right parameters, handles retry, makes run-level decisions. Also owns cross-cutting infrastructure (EventBridge, S3, IAM).
 
 4. **GitHub Action** (in hexo-blog repo) - Triggers on push, runs hexo deploy to GitHub Pages.
 
@@ -34,46 +34,49 @@ news-agent/
 │   ├── background.md               # Context: nanoclaw (source) vs AgentCore (target)
 │   └── implementation-phases.md    # Phased implementation plan
 ├── agents/
-│   ├── collector/                  # Microservice: web content collection
-│   │   ├── CLAUDE.md               # Collector agent spec (interface, tools, config)
-│   │   ├── agent.py                # System prompt + tool registration
-│   │   ├── main.py                 # AgentCore runtime entrypoint
-│   │   ├── tools/                  # Tool implementations
-│   │   ├── config.py               # Agent configuration
+│   ├── collector/                  # Standalone agent: web content collection
+│   │   ├── CLAUDE.md               # Collector agent spec
+│   │   ├── src/                    # Source code
+│   │   │   ├── agent.py            # System prompt + tool registration
+│   │   │   ├── main.py             # AgentCore runtime entrypoint
+│   │   │   ├── tools/              # Tool implementations
+│   │   │   └── config.py           # Agent configuration
+│   │   ├── infra/                  # CDK infrastructure for this agent
+│   │   ├── tests/                  # Agent-specific tests
 │   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   └── tests/                  # Collector-specific tests
-│   ├── publisher/                  # Microservice: editorial + publishing
-│   │   ├── CLAUDE.md               # Publisher agent spec (interface, tools, templates)
-│   │   ├── agent.py
-│   │   ├── main.py
-│   │   ├── tools/
-│   │   ├── templates/              # Jinja2 post templates
+│   │   └── requirements.txt
+│   ├── publisher/                  # Standalone agent: editorial + publishing
+│   │   ├── CLAUDE.md               # Publisher agent spec
+│   │   ├── src/
+│   │   │   ├── agent.py
+│   │   │   ├── main.py
+│   │   │   ├── tools/
+│   │   │   └── templates/          # Jinja2 post templates
+│   │   ├── infra/                  # CDK infrastructure for this agent
+│   │   ├── tests/
 │   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   └── tests/
-│   └── orchestrator/               # Microservice: news workflow coordination
-│       ├── CLAUDE.md               # Orchestrator agent spec (workflow, config)
-│       ├── agent.py
-│       ├── main.py
-│       ├── config.py               # Norwegian sources, schedule, thresholds
+│   │   └── requirements.txt
+│   └── orchestrator/               # Standalone agent: news workflow coordination
+│       ├── CLAUDE.md               # Orchestrator agent spec
+│       ├── src/
+│       │   ├── agent.py
+│       │   ├── main.py
+│       │   └── config.py           # Norwegian sources, schedule, thresholds
+│       ├── infra/                  # CDK infrastructure (agent + cross-cutting: EventBridge, S3, IAM)
+│       │   └── lambda/
+│       │       └── eventbridge_invoker/
+│       ├── tests/
 │       ├── Dockerfile
-│       ├── requirements.txt
-│       └── tests/
-├── infra/                          # CDK stack (EventBridge, Lambda, S3, IAM, Secrets)
-│   ├── news_agent_stack.py
-│   ├── constructs/
-│   └── lambda/
-│       └── eventbridge_invoker/
-└── tests/                          # Integration tests (end-to-end pipeline)
+│       └── requirements.txt
+└── tests/                          # Integration tests (cross-agent end-to-end)
 ```
 
 ## Agent Design Principles
 
 - **Collector and Publisher are general-purpose**: Their interfaces accept arbitrary tasks. They know nothing about Norwegian news or this specific workflow.
 - **Orchestrator is domain-specific**: It encodes the business logic (which feeds, what schedule, what post format).
-- **Each agent is independently deployable**: Own Dockerfile, own ECR repo, own AgentCore runtime.
-- **Each agent is independently evaluable**: Own test suite, own evaluation configs, own metrics.
+- **Each agent subfolder is standalone**: Own `src/` for code, `infra/` for CDK, `tests/` for evaluation. Each can be developed, deployed, and evaluated independently.
+- **Cross-cutting infra lives in orchestrator**: EventBridge scheduling, shared S3 bucket, and IAM roles are deployed from the orchestrator's `infra/`.
 - **Data flows through S3, not LLM context**: Bulk content never passes through the Orchestrator's context window.
 - **Deterministic tools for structural work**: Multi-run merge, dedup, renumbering are Python code. LLM only does creative work (translation, summarization, topic consolidation).
 - **Topic-based content model**: Multiple articles about the same event → one consolidated topic. Reduces noise, produces richer summaries with multiple sources.
@@ -95,7 +98,7 @@ news-agent/
 
 - Python 3.11, Strands Agents SDK
 - AgentCore (Container build type)
-- CDK (Python) for infrastructure
+- CDK (Python) for infrastructure (per-agent, in each agent's `infra/`)
 - Libraries: feedparser, trafilatura, httpx, gitpython, jinja2
 - AWS: EventBridge, Lambda, S3, Secrets Manager, IAM
 - GitHub Actions for hexo deploy
@@ -114,7 +117,7 @@ All implementation MUST follow TDD. No exceptions.
 
 ### Rules
 - Never write implementation code without a failing test that demands it
-- Tests go in each agent's `tests/` directory (unit) or root `tests/` (integration)
+- Tests go in each agent's `tests/` directory (unit) or the root `tests/` directory (integration)
 - Use pytest as the test framework
 - Mock external dependencies (S3, GitHub API, RSS feeds, LLM calls) in unit tests
 - Each tool gets its own test file (e.g., `tests/test_rss_fetcher.py`)
@@ -124,21 +127,21 @@ All implementation MUST follow TDD. No exceptions.
 ```
 agents/collector/tests/
   test_dedup.py              # Dedup source reading + URL extraction
-  test_rss_fetcher.py        # RSS parsing + time filtering
-  test_content_extractor.py  # Article extraction + failure handling
+  test_rss_fetcher.py        # RSS parsing + time filtering (src/tools/)
+  test_content_extractor.py  # Article extraction + failure handling (src/tools/)
   test_consolidation.py      # Topic grouping + matching + "new info?" judgment
-  test_s3_writer.py          # Output format + S3 write
+  test_s3_writer.py          # Output format + S3 write (src/tools/)
   test_agent_e2e.py          # Full agent flow with mocked externals
 
 agents/publisher/tests/
-  test_formatter.py          # Jinja2 template rendering
-  test_merger.py             # Deterministic merge logic
-  test_git_operations.py     # Git clone/commit/push
-  test_s3_reader.py          # S3 read + parse
+  test_formatter.py          # Jinja2 template rendering (src/templates/)
+  test_merger.py             # Deterministic merge logic (src/tools/)
+  test_git_operations.py     # Git clone/commit/push (src/tools/)
+  test_s3_reader.py          # S3 read + parse (src/tools/)
   test_agent_e2e.py          # Full agent flow with mocked externals
 
 agents/orchestrator/tests/
-  test_task_config.py        # Correct config building
+  test_task_config.py        # Correct config building (src/config.py)
   test_workflow.py           # Retry/skip/publish decisions
   test_agent_e2e.py          # Full orchestration with mocked agent calls
 ```
@@ -151,12 +154,15 @@ cd agents/collector && agentcore dev
 cd agents/publisher && agentcore dev
 cd agents/orchestrator && agentcore dev
 
-# Deploy all infrastructure
-cd infra && cdk deploy
+# Deploy agent infrastructure
+cd agents/collector/infra && cdk deploy
+cd agents/publisher/infra && cdk deploy
+cd agents/orchestrator/infra && cdk deploy   # includes shared resources
 
 # Run agent-specific tests
 cd agents/collector && pytest tests/
 cd agents/publisher && pytest tests/
+cd agents/orchestrator && pytest tests/
 
 # Run integration tests
 pytest tests/
