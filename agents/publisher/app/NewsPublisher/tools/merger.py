@@ -1,0 +1,238 @@
+import json
+import re
+import datetime
+
+from strands import tool
+
+SECTION_MAP = {
+    "domestic": "国内新闻",
+    "international": "国际新闻",
+    "business": "财经新闻",
+}
+
+SECTION_ORDER = ["domestic", "international", "business"]
+REVERSE_SECTION_MAP = {v: k for k, v in SECTION_MAP.items()}
+
+
+def _parse_post(content: str) -> dict:
+    """Parse a blog post into structured sections with items."""
+    lines = content.split("\n")
+
+    # Extract frontmatter
+    frontmatter = ""
+    if lines[0].strip() == "---":
+        end_idx = content.index("---", 4)
+        frontmatter = content[: end_idx + 3]
+        rest = content[end_idx + 3 :].strip()
+    else:
+        rest = content
+
+    # Extract day summary (between ## 今日综述 and <!-- more -->)
+    summary_section = ""
+    summary_match = re.search(
+        r"## 今日综述\n(.*?)<!-- more -->", rest, re.DOTALL
+    )
+    if summary_match:
+        summary_section = summary_match.group(1).strip()
+
+    # Parse sections
+    sections = {}
+    section_pattern = r"## (国内新闻|国际新闻|财经新闻)\n"
+    section_splits = re.split(section_pattern, rest)
+
+    current_section = None
+    for i, part in enumerate(section_splits):
+        if part in REVERSE_SECTION_MAP:
+            current_section = REVERSE_SECTION_MAP[part]
+            sections[current_section] = []
+        elif current_section is not None:
+            # Parse items within section
+            item_splits = re.split(r"### \d+\.\s+", part)
+            for item_text in item_splits[1:]:
+                item_lines = item_text.strip().split("\n")
+                title = item_lines[0].strip()
+
+                sources_text = ""
+                earliest_time = ""
+                summary_lines = []
+                changelog = ""
+                past_header = False
+                source_urls = []
+
+                for line in item_lines[1:]:
+                    if line.startswith("**来源**:"):
+                        sources_match = re.search(
+                            r"\*\*来源\*\*:\s*(.+?)\s*\|\s*\*\*最早报道\*\*:\s*(.+)",
+                            line,
+                        )
+                        if sources_match:
+                            sources_text = sources_match.group(1)
+                            earliest_time = sources_match.group(2)
+                        past_header = True
+                    elif line.startswith("原文链接:"):
+                        urls = re.findall(r"\[(.+?)\]\((https?://[^\)]+)\)", line)
+                        source_urls.extend(
+                            [{"source_label": label, "url": url} for label, url in urls]
+                        )
+                    elif line.strip().startswith("(更新于"):
+                        changelog = line.strip()
+                    elif line.strip() == "---":
+                        continue
+                    elif past_header and line.strip():
+                        summary_lines.append(line.strip())
+
+                sections[current_section].append({
+                    "title_zh": title,
+                    "sources_text": sources_text,
+                    "earliest_time": earliest_time,
+                    "summary_zh": "\n".join(summary_lines),
+                    "source_urls": source_urls,
+                    "changelog": changelog,
+                })
+
+    return {
+        "frontmatter": frontmatter,
+        "summary": summary_section,
+        "sections": sections,
+    }
+
+
+def _render_item(number: int, item: dict) -> str:
+    """Render a single item as markdown."""
+    lines = [f"### {number}. {item['title_zh']}"]
+    lines.append(f"**来源**: {item['sources_text']} | **最早报道**: {item['earliest_time']}")
+    lines.append("")
+    lines.append(item["summary_zh"])
+    if item.get("changelog"):
+        lines.append(item["changelog"])
+    lines.append("")
+
+    links = " | ".join(
+        f"[{s['source_label']}]({s['url']})" for s in item["source_urls"]
+    )
+    lines.append(f"原文链接: {links}")
+    lines.append("")
+    lines.append("---")
+    return "\n".join(lines)
+
+
+def _rebuild_post(parsed: dict, updated_time: str) -> str:
+    """Rebuild the full post markdown from parsed structure."""
+    parts = [parsed["frontmatter"], ""]
+    parts.append("## 今日综述")
+    parts.append(parsed["summary"])
+    parts.append("")
+    parts.append("<!-- more -->")
+    parts.append("")
+
+    number = 1
+    for cat in SECTION_ORDER:
+        parts.append(f"## {SECTION_MAP[cat]}")
+        parts.append("")
+        items = parsed["sections"].get(cat, [])
+        for item in items:
+            parts.append(_render_item(number, item))
+            parts.append("")
+            number += 1
+
+    # Footer with all sources
+    all_sources = set()
+    for cat in SECTION_ORDER:
+        for item in parsed["sections"].get(cat, []):
+            for s in item["source_urls"]:
+                all_sources.add(s["source_label"])
+    parts.append(f"*新闻来源: {', '.join(sorted(all_sources))}*")
+    parts.append(f"*最后更新: {updated_time} UTC*")
+
+    return "\n".join(parts)
+
+
+@tool
+def merge_posts(existing_content: str, new_items: str, updated_items: str, strategy: str) -> dict:
+    """Merge new and updated items into an existing blog post.
+
+    Deterministic merge: parses existing markdown, inserts new items at correct positions,
+    updates existing items with new summaries/sources, and renumbers.
+
+    Args:
+        existing_content: The full markdown content of the existing blog post
+        new_items: JSON string of new items to append (same format as Collector output new_items)
+        updated_items: JSON string of items to update (same format as Collector output updated_items)
+        strategy: JSON string with merge strategy options (new_items, updated_items, renumber, regenerate_day_summary)
+
+    Returns:
+        Dict with status, merged content, and counts (new_items_added, existing_items_updated, total_items)
+    """
+    if not existing_content.strip():
+        return {"status": "error", "error": "Cannot merge into empty existing content. Use format_post for new posts."}
+
+    try:
+        parsed = _parse_post(existing_content)
+        new = json.loads(new_items)
+        updated = json.loads(updated_items)
+        strat = json.loads(strategy)
+
+        items_added = 0
+        items_updated = 0
+
+        # Apply updates to existing items
+        for update in updated:
+            match_title = update["match_title_zh"]
+            matched = False
+            for cat in SECTION_ORDER:
+                for item in parsed["sections"].get(cat, []):
+                    if item["title_zh"] == match_title:
+                        item["summary_zh"] = update["updated_summary_zh"]
+                        new_src = update["new_source"]
+                        item["source_urls"].append({
+                            "source_label": new_src["source_label"],
+                            "url": new_src["url"],
+                        })
+                        item["sources_text"] = ", ".join(
+                            s["source_label"] for s in item["source_urls"]
+                        )
+                        item["changelog"] = f"({update['changelog']})"
+                        items_updated += 1
+                        matched = True
+                        break
+                if matched:
+                    break
+
+        # Append new items to correct sections
+        for item in new:
+            cat = item.get("category", "domestic")
+            if cat not in parsed["sections"]:
+                parsed["sections"][cat] = []
+
+            sources = item.get("sources", [])
+            sources_text = ", ".join(s["source_label"] for s in sources)
+            earliest = min((s["published_at"] for s in sources), default="")
+            source_urls = [
+                {"source_label": s["source_label"], "url": s["url"]} for s in sources
+            ]
+
+            parsed["sections"][cat].append({
+                "title_zh": item["title_zh"],
+                "sources_text": sources_text,
+                "earliest_time": earliest,
+                "summary_zh": item["summary_zh"],
+                "source_urls": source_urls,
+                "changelog": "",
+            })
+            items_added += 1
+
+        # Count total items
+        total = sum(len(items) for items in parsed["sections"].values())
+
+        updated_time = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M")
+        content = _rebuild_post(parsed, updated_time)
+
+        return {
+            "status": "success",
+            "content": content,
+            "new_items_added": items_added,
+            "existing_items_updated": items_updated,
+            "total_items": total,
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
