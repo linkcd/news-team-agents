@@ -4,7 +4,7 @@ import pytest
 
 
 def test_extract_content_returns_article_text(sample_article_html):
-    from src.tools.content_extractor import extract_content
+    from tools.content_extractor import extract_content
 
     result = extract_content(html=sample_article_html, url="https://nrk.no/article/123")
 
@@ -14,7 +14,7 @@ def test_extract_content_returns_article_text(sample_article_html):
 
 
 def test_extract_content_handles_empty_html():
-    from src.tools.content_extractor import extract_content
+    from tools.content_extractor import extract_content
 
     result = extract_content(html="", url="https://example.com")
 
@@ -23,7 +23,7 @@ def test_extract_content_handles_empty_html():
 
 
 def test_extract_content_handles_non_article_html():
-    from src.tools.content_extractor import extract_content
+    from tools.content_extractor import extract_content
 
     html = "<html><body><nav>Menu</nav><footer>Footer</footer></body></html>"
     result = extract_content(html=html, url="https://example.com")
@@ -33,9 +33,9 @@ def test_extract_content_handles_non_article_html():
 
 
 def test_extract_content_handles_trafilatura_failure():
-    from src.tools.content_extractor import extract_content
+    from tools.content_extractor import extract_content
 
-    with patch("src.tools.content_extractor.trafilatura.extract", return_value=None):
+    with patch("tools.content_extractor.trafilatura.extract", return_value=None):
         result = extract_content(
             html="<html><body>content</body></html>", url="https://example.com"
         )

@@ -5,7 +5,7 @@ import pytest
 
 
 def test_write_to_s3_writes_json():
-    from src.tools.s3_writer import write_to_s3
+    from tools.s3_writer import write_to_s3
 
     data = {
         "task_id": "test-001",
@@ -14,7 +14,7 @@ def test_write_to_s3_writes_json():
         "metadata": {"sources_fetched": 1},
     }
 
-    with patch("src.tools.s3_writer.boto3") as mock_boto3:
+    with patch("tools.s3_writer.boto3") as mock_boto3:
         mock_s3 = MagicMock()
         mock_boto3.client.return_value = mock_s3
 
@@ -36,9 +36,9 @@ def test_write_to_s3_writes_json():
 
 
 def test_write_to_s3_handles_error():
-    from src.tools.s3_writer import write_to_s3
+    from tools.s3_writer import write_to_s3
 
-    with patch("src.tools.s3_writer.boto3") as mock_boto3:
+    with patch("tools.s3_writer.boto3") as mock_boto3:
         mock_s3 = MagicMock()
         mock_boto3.client.return_value = mock_s3
         mock_s3.put_object.side_effect = Exception("Access Denied")

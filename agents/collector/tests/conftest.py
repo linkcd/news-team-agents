@@ -1,5 +1,9 @@
+import os
 import sys
 from unittest.mock import MagicMock
+
+# Add app/NewsCollector to path so tests can import tools, config, agent
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app", "NewsCollector"))
 
 # Stub out the strands module for testing (not available on PyPI)
 strands_mock = MagicMock()

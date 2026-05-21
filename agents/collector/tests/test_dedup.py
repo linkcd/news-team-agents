@@ -5,7 +5,7 @@ import pytest
 
 
 def test_get_dedup_context_none_type():
-    from src.tools.dedup import get_dedup_context
+    from tools.dedup import get_dedup_context
 
     result = get_dedup_context(dedup_config='{"type": "none"}')
 
@@ -15,7 +15,7 @@ def test_get_dedup_context_none_type():
 
 
 def test_get_dedup_context_url_list():
-    from src.tools.dedup import get_dedup_context
+    from tools.dedup import get_dedup_context
 
     config = '{"type": "url_list", "urls": ["https://nrk.no/1", "https://vg.no/2"]}'
     result = get_dedup_context(dedup_config=config)
@@ -26,7 +26,7 @@ def test_get_dedup_context_url_list():
 
 
 def test_get_dedup_context_github_file():
-    from src.tools.dedup import get_dedup_context
+    from tools.dedup import get_dedup_context
 
     markdown_content = """---
 title: 挪威新闻 2026-05-21
@@ -47,7 +47,7 @@ title: 挪威新闻 2026-05-21
 气象研究所发布了暴风雨警告。
 """
 
-    with patch("src.tools.dedup.httpx") as mock_httpx:
+    with patch("tools.dedup.httpx") as mock_httpx:
         mock_response = MagicMock()
         mock_response.text = markdown_content
         mock_response.status_code = 200
@@ -67,7 +67,7 @@ title: 挪威新闻 2026-05-21
 
 
 def test_get_dedup_context_s3_file():
-    from src.tools.dedup import get_dedup_context
+    from tools.dedup import get_dedup_context
 
     s3_data = json.dumps(
         {
@@ -85,7 +85,7 @@ def test_get_dedup_context_s3_file():
         }
     )
 
-    with patch("src.tools.dedup.boto3") as mock_boto3:
+    with patch("tools.dedup.boto3") as mock_boto3:
         mock_s3 = MagicMock()
         mock_boto3.client.return_value = mock_s3
         mock_body = MagicMock()
@@ -103,9 +103,9 @@ def test_get_dedup_context_s3_file():
 
 
 def test_get_dedup_context_handles_github_404():
-    from src.tools.dedup import get_dedup_context
+    from tools.dedup import get_dedup_context
 
-    with patch("src.tools.dedup.httpx") as mock_httpx:
+    with patch("tools.dedup.httpx") as mock_httpx:
         mock_response = MagicMock()
         mock_response.status_code = 404
         mock_response.raise_for_status.side_effect = Exception("404 Not Found")
