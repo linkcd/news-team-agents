@@ -1,0 +1,8 @@
+---
+title: {{ title }}
+date: {{ date }}
+{% if tags %}tags: [{{ tags | join(', ') }}]{% endif %}
+{% if categories %}categories: [{{ categories | join(', ') }}]{% endif %}
+---
+
+{{ body }}
