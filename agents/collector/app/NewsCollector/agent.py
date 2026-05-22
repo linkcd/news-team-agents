@@ -3,7 +3,7 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from config import MODEL_ID
-from tools import fetch_rss, fetch_webpage, extract_content, get_dedup_context, write_to_s3
+from tools import fetch_rss, fetch_and_extract, get_dedup_context, write_to_s3
 
 SYSTEM_PROMPT = """You are a web content collection agent. You receive a task configuration and execute a structured pipeline to collect, deduplicate, consolidate, translate, and output web content.
 
@@ -20,7 +20,7 @@ This gives you:
 ### Step 2: Fetch Sources
 For each source in the task:
 - If type is "rss": call fetch_rss(url, time_window_hours)
-- If type is "webpage": call fetch_webpage(url)
+- If type is "webpage": call fetch_and_extract(url) directly
 Collect all articles from all sources.
 
 ### Step 3: URL Deduplication
@@ -29,7 +29,8 @@ Track: skipped_already_seen_urls count.
 
 ### Step 4: Extract Full Content
 If processing.extract_full_content is true:
-- For each remaining article, call fetch_webpage(url) then extract_content(html, url)
+- For each remaining article, call fetch_and_extract(url)
+- This fetches the webpage and extracts article text in one step (returns only text, not raw HTML)
 - If extraction fails, skip that article silently
 - Track failed extractions in metadata
 
@@ -119,5 +120,5 @@ def create_agent() -> Agent:
         description="General-purpose web content collection agent. Fetches RSS feeds and webpages, deduplicates by URL, consolidates related articles into topics, translates/summarizes, and writes structured JSON output to S3.",
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[fetch_rss, fetch_webpage, extract_content, get_dedup_context, write_to_s3],
+        tools=[fetch_rss, fetch_and_extract, get_dedup_context, write_to_s3],
     )
