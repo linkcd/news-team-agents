@@ -177,8 +177,9 @@ Receives A2A `message/send` requests (JSON-RPC 2.0). The task config is passed a
    - Filter by time window (e.g. last 6 hours)
    - Remove already-seen URLs (exact match on known_urls)
 
-3. EXTRACT CONTENT
-   - For remaining URLs: extract full article text (trafilatura, 10s timeout)
+3. FETCH + EXTRACT CONTENT
+   - For remaining URLs: call fetch_and_extract(url) which fetches and extracts in one step
+   - Returns only extracted text (raw HTML never enters LLM context)
    - On failure: skip silently
 
 4. CONSOLIDATE (LLM)
@@ -201,8 +202,7 @@ Receives A2A `message/send` requests (JSON-RPC 2.0). The task config is passed a
 | Tool | Purpose |
 |------|---------|
 | `fetch_rss(url, time_window_hours)` | Parse RSS feed, filter by time window |
-| `fetch_webpage(url)` | Fetch single webpage content |
-| `extract_content(html)` | Extract article text from HTML (trafilatura, 10s timeout) |
+| `fetch_and_extract(url)` | Fetch webpage and extract article text in one step (trafilatura, 10s timeout). Returns only extracted text — raw HTML never enters LLM context. |
 | `get_dedup_context(dedup_source)` | Read existing URLs + topic summaries from dedup source |
 | `write_to_s3(bucket, key, data)` | Write JSON output to S3 |
 
@@ -249,7 +249,7 @@ The agent supports multiple dedup source types:
 
 ```bash
 agentcore dev                    # local development
-python3 -m pytest tests/ -v      # run unit tests (21 tests)
+python3 -m pytest tests/ -v      # run unit tests (28 tests)
 agentcore deploy -y              # deploy to AWS
 agentcore invoke '{"task": {...}}' --stream  # invoke
 ```

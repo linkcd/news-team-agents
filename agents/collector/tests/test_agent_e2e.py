@@ -32,11 +32,10 @@ Loven ble vedtatt med 95 mot 74 stemmer etter en lang debatt.</p>
 
 def test_tools_are_importable():
     """Verify all tools can be imported from the tools package."""
-    from tools import fetch_rss, fetch_webpage, extract_content, get_dedup_context, write_to_s3
+    from tools import fetch_rss, fetch_and_extract, get_dedup_context, write_to_s3
 
     assert callable(fetch_rss)
-    assert callable(fetch_webpage)
-    assert callable(extract_content)
+    assert callable(fetch_and_extract)
     assert callable(get_dedup_context)
     assert callable(write_to_s3)
 
@@ -44,8 +43,7 @@ def test_tools_are_importable():
 def test_full_pipeline_tools_integration(mock_rss_response, mock_article_html):
     """Test that tools work together in the expected pipeline sequence."""
     from tools.rss_fetcher import fetch_rss
-    from tools.webpage_fetcher import fetch_webpage
-    from tools.content_extractor import extract_content
+    from tools.article_fetcher import fetch_and_extract
     from tools.dedup import get_dedup_context
     from tools.s3_writer import write_to_s3
 
@@ -70,24 +68,20 @@ def test_full_pipeline_tools_integration(mock_rss_response, mock_article_html):
     assert len(rss_result["articles"]) == 1
     article_url = rss_result["articles"][0]["url"]
 
-    # Step 3: Fetch webpage
-    with patch("tools.webpage_fetcher.httpx") as mock_httpx:
+    # Step 3: Fetch and extract content (single tool call, no raw HTML in context)
+    with patch("tools.article_fetcher.httpx") as mock_httpx:
         mock_resp = MagicMock()
         mock_resp.text = mock_article_html
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
         mock_httpx.get.return_value = mock_resp
 
-        page_result = fetch_webpage(url=article_url)
+        extract_result = fetch_and_extract(url=article_url)
 
-    assert page_result["status"] == "success"
-
-    # Step 4: Extract content
-    extract_result = extract_content(html=page_result["html"], url=article_url)
     assert extract_result["status"] == "success"
     assert "digitalisering" in extract_result["text"]
 
-    # Step 5: Write to S3
+    # Step 4: Write to S3
     output_data = json.dumps(
         {
             "task_id": "test-001",
