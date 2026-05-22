@@ -1,15 +1,16 @@
 from strands import tool
 
 from config import COLLECTOR_RUNTIME_ARN
-from tools.a2a_client import get_collector_client, invoke_a2a
+from tools import a2a_client
 
 
 @tool
 def invoke_collector(task_config: dict) -> dict:
-    """Invoke the Collector agent via A2A protocol.
+    """Invoke the Collector agent via A2A protocol with streaming.
 
-    Sends a message/send JSON-RPC request to the Collector runtime with the
-    given task configuration. Returns the parsed result or error.
+    Sends a task configuration to the Collector runtime using the strands A2AAgent
+    client with SigV4 authentication and SSE streaming. Each streaming event resets
+    the connection idle timeout, allowing long-running collections.
 
     Args:
         task_config: Collection task configuration (sources, filters, processing, output).
@@ -17,9 +18,4 @@ def invoke_collector(task_config: dict) -> dict:
     Returns:
         Dict with 'status' ('success'/'error') and either the collection result or error message.
     """
-    return invoke_a2a(
-        client=get_collector_client(),
-        runtime_arn=COLLECTOR_RUNTIME_ARN,
-        session_prefix="collector-session",
-        message_parts=[{"data": {"task": task_config}}],
-    )
+    return a2a_client.invoke_a2a(COLLECTOR_RUNTIME_ARN, task_config)

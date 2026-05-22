@@ -1,120 +1,107 @@
 import json
+import logging
 import re
-import uuid
 from typing import Optional
+from uuid import uuid4
 
 import boto3
+import httpx
+from a2a.client import ClientConfig
+from bedrock_agentcore.runtime import build_runtime_url
 from botocore.config import Config as BotoConfig
+from strands.agent.a2a_agent import A2AAgent
 
 from config import AWS_REGION
+from tools.sigv4_auth import SigV4HTTPXAuth
+
+logger = logging.getLogger(__name__)
 
 DISCOVERY_CONFIG = BotoConfig(read_timeout=120, connect_timeout=10)
-COLLECTOR_INVOKE_CONFIG = BotoConfig(read_timeout=600, connect_timeout=10)
-PUBLISHER_INVOKE_CONFIG = BotoConfig(read_timeout=300, connect_timeout=10)
 
-_discovery_client = boto3.client("bedrock-agentcore", region_name=AWS_REGION, config=DISCOVERY_CONFIG)
-_collector_client = boto3.client("bedrock-agentcore", region_name=AWS_REGION, config=COLLECTOR_INVOKE_CONFIG)
-_publisher_client = boto3.client("bedrock-agentcore", region_name=AWS_REGION, config=PUBLISHER_INVOKE_CONFIG)
+_discovery_client = None
 
 
 def get_discovery_client():
+    """Get a boto3 client for fast discovery pings (blocking, not streaming)."""
+    global _discovery_client
+    if _discovery_client is None:
+        _discovery_client = boto3.client("bedrock-agentcore", region_name=AWS_REGION, config=DISCOVERY_CONFIG)
     return _discovery_client
 
 
-def get_collector_client():
-    return _collector_client
+_STREAMING_TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0)
 
 
-def get_publisher_client():
-    return _publisher_client
+def invoke_a2a(runtime_arn: str, task_config: dict) -> dict:
+    """Invoke a remote agent via A2A streaming and return the result."""
+    endpoint = build_runtime_url(runtime_arn, AWS_REGION)
+    session_id = str(uuid4())
 
+    boto_session = boto3.Session()
+    credentials = boto_session.get_credentials().get_frozen_credentials()
+    auth = SigV4HTTPXAuth(credentials, "bedrock-agentcore", AWS_REGION)
 
-def invoke_a2a(client, runtime_arn: str, session_prefix: str, message_parts: list, *, runtime_user_id: Optional[str] = None) -> dict:
-    """Send an A2A message/send request and parse the response."""
-    session_id = f"{session_prefix}-{uuid.uuid4().hex}"
+    client_config = ClientConfig(
+        httpx_client=httpx.AsyncClient(
+            auth=auth,
+            timeout=_STREAMING_TIMEOUT,
+            headers={"X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id},
+        ),
+    )
+    agent = A2AAgent(endpoint=endpoint, client_config=client_config)
 
-    a2a_payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "message/send",
-        "params": {
-            "message": {
-                "messageId": f"msg-{uuid.uuid4().hex[:12]}",
-                "role": "user",
-                "parts": message_parts,
-            }
-        },
-    }
-
-    kwargs = {
-        "agentRuntimeArn": runtime_arn,
-        "runtimeSessionId": session_id,
-        "payload": json.dumps(a2a_payload),
-    }
-    if runtime_user_id:
-        kwargs["runtimeUserId"] = runtime_user_id
+    prompt = json.dumps({"task": task_config})
 
     try:
-        response = client.invoke_agent_runtime(**kwargs)
-        body = json.loads(response["response"].read())
+        result = agent(prompt)
     except Exception as e:
+        logger.error("A2A invocation failed: %s", e)
         return {"status": "error", "error": str(e)}
 
-    if "error" in body:
-        return {"status": "error", "error": body["error"].get("message", str(body["error"]))}
-
-    result = body.get("result", {})
-    status = result.get("status", {})
-
-    if status.get("state") == "failed":
-        return {"status": "error", "error": _extract_status_message(status)}
-
-    artifacts = result.get("artifacts", [])
-    if artifacts:
-        for part in artifacts[0].get("parts", []):
-            if "data" in part:
-                return part["data"]
-            if "text" in part:
-                return parse_result_from_text(part["text"])
-
-    history = result.get("history", [])
-    for message in reversed(history):
-        for part in message.get("parts", []):
-            if "data" in part:
-                return part["data"]
-            if "text" in part:
-                parsed = parse_result_from_text(part["text"])
-                if parsed.get("status") == "success":
-                    return parsed
-
-    return {"status": "error", "error": "No artifact data in response"}
+    return _parse_agent_result(result)
 
 
-def parse_result_from_text(text: str) -> dict:
-    """Extract JSON result from the agent's text response."""
+def _parse_agent_result(result) -> dict:
+    """Extract the JSON result from AgentResult message content."""
+    content = result.message.get("content", [])
+
+    # First pass: check each content block individually
+    for block in content:
+        text = block.get("text", "")
+        if not text:
+            continue
+        parsed = _extract_json(text)
+        if parsed and "status" in parsed:
+            return parsed
+
+    # Second pass: concatenate all text blocks (streaming may split across chunks)
+    all_text = " ".join(block.get("text", "") for block in content if block.get("text"))
+    if all_text:
+        parsed = _extract_json(all_text)
+        if parsed and "status" in parsed:
+            return parsed
+
+    # Last resort: try str(result) which includes the full agent output
+    result_str = str(result)
+    if result_str:
+        parsed = _extract_json(result_str)
+        if parsed and "status" in parsed:
+            return parsed
+
+    return {"status": "error", "error": "No structured result in agent response"}
+
+
+def _extract_json(text: str) -> Optional[dict]:
+    """Extract JSON dict from text (fenced or raw)."""
     json_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
     if json_match:
         try:
-            parsed = json.loads(json_match.group(1))
-            if "status" in parsed:
-                return parsed
+            return json.loads(json_match.group(1))
         except json.JSONDecodeError:
             pass
     try:
         start = text.index("{")
         end = text.rindex("}") + 1
-        parsed = json.loads(text[start:end])
-        if "status" in parsed:
-            return parsed
+        return json.loads(text[start:end])
     except (ValueError, json.JSONDecodeError):
-        pass
-    return {"status": "error", "error": "Could not parse result from text response"}
-
-
-def _extract_status_message(status: dict) -> str:
-    message = status.get("message", {})
-    parts = message.get("parts", [])
-    for part in parts:
-        if "text" in part:
-            return part["text"]
-    return "Unknown error"
+        return None
