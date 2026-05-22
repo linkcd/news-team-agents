@@ -8,61 +8,31 @@ import pytest
 
 
 @pytest.fixture
-def mock_boto3_client():
-    """Provide a unified mock client that all a2a_client module clients delegate to."""
+def mock_invoke_a2a():
+    """Patch invoke_a2a at the module level to control responses."""
     from tools import a2a_client
-    client = MagicMock()
-    # Point all module-level clients to the same mock
-    a2a_client._discovery_client = client
-    a2a_client._collector_client = client
-    a2a_client._publisher_client = client
-    yield client
-    client.reset_mock()
+    original = a2a_client.invoke_a2a
+    mock = MagicMock()
+    a2a_client.invoke_a2a = mock
+    yield mock
+    a2a_client.invoke_a2a = original
+
+
+# Legacy fixture name for backward compatibility
+@pytest.fixture
+def mock_boto3_client(mock_invoke_a2a):
+    """Adapts the old fixture interface to the new invoke_a2a mock."""
+    return mock_invoke_a2a
 
 
 def make_a2a_success_response(data: dict) -> dict:
-    """Helper to create an A2A success response."""
-    return {
-        "response": MagicMock(
-            read=MagicMock(
-                return_value=json.dumps(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "result": {
-                            "id": "task-1",
-                            "status": {"state": "completed"},
-                            "artifacts": [{"parts": [{"data": data}]}],
-                        },
-                    }
-                ).encode()
-            )
-        )
-    }
+    """Helper: returns data as if invoke_a2a succeeded."""
+    return data
 
 
 def make_a2a_error_response(error_text: str) -> dict:
-    """Helper to create an A2A error response."""
-    return {
-        "response": MagicMock(
-            read=MagicMock(
-                return_value=json.dumps(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": 1,
-                        "result": {
-                            "id": "task-1",
-                            "status": {
-                                "state": "failed",
-                                "message": {"parts": [{"text": error_text}]},
-                            },
-                            "artifacts": [],
-                        },
-                    }
-                ).encode()
-            )
-        )
-    }
+    """Helper: returns an error dict as if invoke_a2a got a failure."""
+    return {"status": "error", "error": error_text}
 
 
 class TestOrchestratorWorkflow:
@@ -98,7 +68,7 @@ class TestOrchestratorWorkflow:
             },
         }
 
-        mock_boto3_client.invoke_agent_runtime.side_effect = [
+        mock_boto3_client.side_effect = [
             make_a2a_success_response(collector_result),
             make_a2a_success_response(publisher_result),
         ]
@@ -158,7 +128,7 @@ class TestOrchestratorWorkflow:
             },
         }
 
-        mock_boto3_client.invoke_agent_runtime.side_effect = [
+        mock_boto3_client.side_effect = [
             make_a2a_success_response(collector_result),
             make_a2a_success_response(publisher_result),
         ]
@@ -206,7 +176,7 @@ class TestOrchestratorWorkflow:
             },
         }
 
-        mock_boto3_client.invoke_agent_runtime.return_value = make_a2a_success_response(collector_result)
+        mock_boto3_client.return_value = make_a2a_success_response(collector_result)
 
         coll_result = invoke_collector({
             "task_id": "norway-news-2026-05-21-2300",
@@ -221,7 +191,7 @@ class TestOrchestratorWorkflow:
         assert coll_result["summary"]["matched_to_existing_topics"] == 0
         # In the real agent flow, the LLM would decide not to call invoke_publisher.
         # We verify the collector was called only once (no publisher call).
-        assert mock_boto3_client.invoke_agent_runtime.call_count == 1
+        assert mock_boto3_client.call_count == 1
 
     def test_collector_failure_with_retry(self, mock_boto3_client):
         """Collector fails first time, retried once, succeeds on second attempt."""
@@ -234,7 +204,7 @@ class TestOrchestratorWorkflow:
             "summary": {"grouped_into_new_topics": 2, "matched_to_existing_topics": 0},
         }
 
-        mock_boto3_client.invoke_agent_runtime.side_effect = [
+        mock_boto3_client.side_effect = [
             make_a2a_error_response("Timeout fetching RSS"),
             make_a2a_success_response(collector_success),
         ]
@@ -254,7 +224,7 @@ class TestOrchestratorWorkflow:
         """Collector fails both attempts, orchestrator reports failure."""
         from tools.invoke_collector import invoke_collector
 
-        mock_boto3_client.invoke_agent_runtime.side_effect = [
+        mock_boto3_client.side_effect = [
             make_a2a_error_response("Timeout fetching RSS"),
             make_a2a_error_response("Timeout fetching RSS again"),
         ]
@@ -272,7 +242,7 @@ class TestOrchestratorWorkflow:
         """Publisher failure is not retried."""
         from tools.invoke_publisher import invoke_publisher
 
-        mock_boto3_client.invoke_agent_runtime.return_value = make_a2a_error_response("Git push rejected: conflict")
+        mock_boto3_client.return_value = make_a2a_error_response("Git push rejected: conflict")
 
         result = invoke_publisher({
             "task_id": "publish-norway-2026-05-21-1100",
@@ -282,7 +252,7 @@ class TestOrchestratorWorkflow:
         assert result["status"] == "error"
         assert "Git push rejected" in result["error"]
         # Only one call — no retry
-        assert mock_boto3_client.invoke_agent_runtime.call_count == 1
+        assert mock_boto3_client.call_count == 1
 
 
 class TestConfigIntegration:

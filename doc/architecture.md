@@ -175,21 +175,32 @@ See `agents/orchestrator/CLAUDE.md` for full workflow spec.
 
 ## Inter-Agent Communication
 
-### Control Flow
-Orchestrator calls Collector and Publisher via boto3 `invoke_agent_runtime`. The topology is fixed (orchestrator knows both ARNs as env vars).
+### Protocol: A2A over SSE Streaming
+
+Orchestrator invokes Collector and Publisher using the strands `A2AAgent` client with Server-Sent Events (SSE) streaming. The topology is fixed (orchestrator knows both ARNs as env vars).
 
 ```python
-import boto3
-import json
+from bedrock_agentcore.runtime import build_runtime_url
+from strands.agent.a2a_agent import A2AAgent
+from a2a.client import ClientConfig
 
-client = boto3.client('bedrock-agentcore')
-
-response = client.invoke_agent_runtime(
-    agentRuntimeArn=os.environ['COLLECTOR_ARN'],
-    qualifier="DEFAULT",
-    payload=json.dumps(collector_task_config)
+endpoint = build_runtime_url(runtime_arn, region)
+client_config = ClientConfig(
+    httpx_client=httpx.AsyncClient(
+        auth=SigV4HTTPXAuth(credentials, "bedrock-agentcore", region),
+        timeout=httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0),
+        headers={"X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id},
+    ),
 )
+agent = A2AAgent(endpoint=endpoint, client_config=client_config)
+result = agent(json.dumps({"task": task_config}))
 ```
+
+Key implementation details:
+- **`bedrock_agentcore.runtime.build_runtime_url`** builds the HTTPS invocation URL from an agent ARN
+- **`SigV4HTTPXAuth`** (custom `httpx.Auth` subclass in `tools/sigv4_auth.py`) signs each HTTP request with AWS SigV4
+- **SSE streaming** keeps the connection alive during long-running agent tasks — each streamed event resets the idle timeout
+- **Server-side** uses `StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True)` for all agents
 
 ### Data Flow
 Bulk article data passes via S3, not through the Orchestrator's LLM context:
@@ -200,9 +211,8 @@ Bulk article data passes via S3, not through the Orchestrator's LLM context:
 **Rationale**: Avoids large payloads in Orchestrator context (token waste, latency, corruption risk). Provides natural audit trail.
 
 ### Timeout Policy
-- Collector invocation: 10 minute timeout
-- Publisher invocation: 5 minute timeout
-- On timeout: treat as error, retry once
+- HTTP read timeout: 120s per SSE event (streaming resets this on each event)
+- On error: retry once for Collector, no retry for Publisher
 
 ---
 
@@ -314,10 +324,11 @@ Each agent is evaluated independently:
 
 | Component | Technology |
 |-----------|-----------|
-| Agent Framework | Strands Agents SDK (Python) |
+| Agent Framework | Strands Agents SDK (Python), with A2A protocol support |
+| A2A Client | strands `A2AAgent` + `a2a-sdk` `ClientConfig` + custom SigV4 httpx auth |
 | LLM | Claude Sonnet 4 via Amazon Bedrock |
-| Infrastructure | AWS CDK (Python) |
-| Runtime | AgentCore (Container build, Python 3.11) |
+| Infrastructure | AWS CDK (TypeScript, managed by agentcore CLI) |
+| Runtime | AgentCore (Container build, Python 3.12) |
 | RSS Parsing | feedparser |
 | Article Extraction | trafilatura |
 | HTTP Client | httpx |
@@ -340,7 +351,7 @@ Each agent is evaluated independently:
 | Content model | Topic-based (consolidated) not article-based | Multiple articles about the same event → one topic. Reduces noise, richer summaries. |
 | Topic matching | LLM semantic similarity (no explicit IDs) | Most flexible; handles paraphrased titles, different angles on same event. Non-deterministic but acceptable for editorial use. |
 | Topic updates | Regenerate summary + changelog note | Reads naturally; changelog provides transparency on when/what was added |
-| Inter-agent comms | boto3 `invoke_agent_runtime` | Fixed topology; A2A adds unnecessary discovery overhead |
+| Inter-agent comms | strands `A2AAgent` + SSE streaming + SigV4 | Native A2A protocol; SSE streaming avoids idle timeouts on long tasks |
 | Data passing | S3 intermediate storage | Avoids large payloads in Orchestrator LLM context; provides audit trail |
 | Dedup ownership | Collector reads existing post from GitHub | Collector is self-contained; Orchestrator stays lightweight |
 | Hexo deployment | GitHub Action (not in Publisher container) | Decouples LLM work from build toolchain; easier to debug |

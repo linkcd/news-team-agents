@@ -82,11 +82,14 @@ class TestAgentDiscovery:
     def test_verify_agents_reports_unavailable_agent(self, client):
         """verify_agents reports agent as unavailable if invocation fails."""
         from tools.discovery import verify_agents
+        from config import PUBLISHER_RUNTIME_ARN
 
-        client.invoke_agent_runtime.side_effect = [
-            _a2a_success_response(),
-            Exception("Publisher not deployed"),
-        ]
+        def _side_effect(**kwargs):
+            if kwargs.get("agentRuntimeArn") == PUBLISHER_RUNTIME_ARN:
+                raise Exception("Publisher not deployed")
+            return _a2a_success_response()
+
+        client.invoke_agent_runtime.side_effect = _side_effect
 
         result = verify_agents()
 

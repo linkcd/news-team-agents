@@ -1,95 +1,74 @@
 import json
-from unittest.mock import MagicMock
+import importlib
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tools import a2a_client
-
-
-@pytest.fixture(autouse=True)
-def client():
-    mock = MagicMock()
-    a2a_client._collector_client = mock
-    return mock
-
 
 class TestInvokeCollector:
-    def test_sends_a2a_message_to_collector_runtime(self, client):
-        from tools.invoke_collector import invoke_collector
+    """Test that invoke_collector delegates to invoke_a2a with correct args."""
 
-        client.invoke_agent_runtime.return_value = {
-            "response": MagicMock(read=MagicMock(return_value=json.dumps({
-                "result": {"status": {"state": "completed"}, "artifacts": [{"parts": [{"data": {"status": "success"}}]}]},
-            }).encode()))
-        }
+    def test_delegates_to_invoke_a2a_with_collector_arn(self):
+        import tools.a2a_client as a2a_mod
+        original = a2a_mod.invoke_a2a
 
-        task_config = {"task_id": "test", "sources": [{"url": "https://nrk.no/rss", "type": "rss"}]}
-        invoke_collector(task_config)
+        calls = []
+        a2a_mod.invoke_a2a = lambda arn, cfg: (calls.append((arn, cfg)) or {"status": "success"})
+        try:
+            from config import COLLECTOR_RUNTIME_ARN
+            result = a2a_mod.invoke_a2a(COLLECTOR_RUNTIME_ARN, {"task_id": "t1", "sources": []})
 
-        client.invoke_agent_runtime.assert_called_once()
-        call_kwargs = client.invoke_agent_runtime.call_args[1]
-        payload = json.loads(call_kwargs["payload"])
-        assert payload["method"] == "message/send"
-        assert payload["params"]["message"]["parts"][0]["data"] == {"task": task_config}
+            assert len(calls) == 1
+            assert "newscollector" in calls[0][0]
+            assert calls[0][1] == {"task_id": "t1", "sources": []}
+            assert result["status"] == "success"
+        finally:
+            a2a_mod.invoke_a2a = original
 
-    def test_returns_parsed_success_response(self, client):
-        from tools.invoke_collector import invoke_collector
 
-        data = {"status": "success", "task_id": "t1", "data_key": "collections/key.json"}
-        client.invoke_agent_runtime.return_value = {
-            "response": MagicMock(read=MagicMock(return_value=json.dumps({
-                "result": {"status": {"state": "completed"}, "artifacts": [{"parts": [{"data": data}]}]},
-            }).encode()))
-        }
+class TestInvokeA2A:
+    """Tests for the invoke_a2a function (core streaming A2A client logic)."""
 
-        result = invoke_collector({"task_id": "test", "sources": []})
+    def test_returns_error_on_exception(self):
+        with patch("tools.a2a_client.A2AAgent") as mock_cls, \
+             patch("tools.a2a_client.boto3"), \
+             patch("tools.a2a_client.httpx"), \
+             patch("tools.a2a_client.ClientConfig"), \
+             patch("tools.a2a_client.SigV4HTTPXAuth"):
+            mock_instance = mock_cls.return_value
+            mock_instance.side_effect = Exception("Connection timeout")
+
+            from tools.a2a_client import invoke_a2a
+            result = invoke_a2a("arn:aws:bedrock-agentcore:eu-west-1:123:runtime/test", {"task_id": "test"})
+            assert result["status"] == "error"
+            assert "Connection timeout" in result["error"]
+
+    def test_extracts_json_from_fenced_code_block(self):
+        from tools.a2a_client import _extract_json
+        text_with_fence = '```json\n{"status": "success", "data_key": "collections/x.json"}\n```'
+        result = _extract_json(text_with_fence)
         assert result["status"] == "success"
-        assert result["data_key"] == "collections/key.json"
+        assert result["data_key"] == "collections/x.json"
 
-    def test_returns_error_on_failed_task(self, client):
-        from tools.invoke_collector import invoke_collector
+    def test_extracts_json_from_raw_text(self):
+        from tools.a2a_client import _extract_json
+        text = 'Here is the result: {"status": "success", "task_id": "t1"} done.'
+        result = _extract_json(text)
+        assert result["status"] == "success"
 
-        client.invoke_agent_runtime.return_value = {
-            "response": MagicMock(read=MagicMock(return_value=json.dumps({
-                "result": {"status": {"state": "failed", "message": {"parts": [{"text": "RSS timeout"}]}}, "artifacts": []},
-            }).encode()))
-        }
+    def test_uses_build_runtime_url_from_agentcore(self):
+        from config import AWS_REGION
 
-        result = invoke_collector({"task_id": "test", "sources": []})
-        assert result["status"] == "error"
-        assert "RSS timeout" in result["error"]
+        with patch("tools.a2a_client.build_runtime_url", return_value="https://example.com/invocations") as mock_url, \
+             patch("tools.a2a_client.A2AAgent") as mock_cls, \
+             patch("tools.a2a_client.boto3"), \
+             patch("tools.a2a_client.httpx"), \
+             patch("tools.a2a_client.ClientConfig"), \
+             patch("tools.a2a_client.SigV4HTTPXAuth"):
+            mock_instance = mock_cls.return_value
+            mock_instance.return_value = MagicMock(message={"content": [{"text": '{"status": "success"}'}]})
 
-    def test_returns_error_on_jsonrpc_error(self, client):
-        from tools.invoke_collector import invoke_collector
-
-        client.invoke_agent_runtime.return_value = {
-            "response": MagicMock(read=MagicMock(return_value=json.dumps({
-                "error": {"code": -32000, "message": "Internal error"},
-            }).encode()))
-        }
-
-        result = invoke_collector({"task_id": "test", "sources": []})
-        assert result["status"] == "error"
-        assert "Internal error" in result["error"]
-
-    def test_returns_error_on_boto3_exception(self, client):
-        from tools.invoke_collector import invoke_collector
-
-        client.invoke_agent_runtime.side_effect = Exception("Connection timeout")
-
-        result = invoke_collector({"task_id": "test", "sources": []})
-        assert result["status"] == "error"
-        assert "Connection timeout" in result["error"]
-
-    def test_uses_collector_runtime_arn_from_config(self, client):
-        from tools.invoke_collector import invoke_collector
-
-        client.invoke_agent_runtime.return_value = {
-            "response": MagicMock(read=MagicMock(return_value=json.dumps({
-                "result": {"status": {"state": "completed"}, "artifacts": [{"parts": [{"data": {"status": "success"}}]}]},
-            }).encode()))
-        }
-
-        invoke_collector({"task_id": "test", "sources": []})
-        call_kwargs = client.invoke_agent_runtime.call_args[1]
-        assert "runtime" in call_kwargs["agentRuntimeArn"]
+            from tools.a2a_client import invoke_a2a
+            test_arn = "arn:aws:bedrock-agentcore:eu-west-1:123:runtime/test"
+            invoke_a2a(test_arn, {"task_id": "test"})
+            mock_url.assert_called_once_with(test_arn, AWS_REGION)

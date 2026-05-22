@@ -6,7 +6,7 @@ A general-purpose editorial and publishing agent. Given content (from S3 or dire
 
 - **Runtime ID**: `newspublisher_NewsPublisher-jF5YE229x9`
 - **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9`
-- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent))`
+- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))`
 - **Region**: eu-west-1
 
 ## Purpose

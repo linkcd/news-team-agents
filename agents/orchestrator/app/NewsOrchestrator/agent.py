@@ -1,7 +1,7 @@
 from strands import Agent
 from strands.models import BedrockModel
 
-from config import MODEL_ID
+from config import MODEL_ID, S3_BUCKET, NEWS_SOURCES
 from tools import invoke_collector, invoke_publisher, verify_agents
 
 SYSTEM_PROMPT = """You are a workflow orchestration agent for Norwegian news collection and publishing.
@@ -39,7 +39,7 @@ Construct the task configuration for the Collector agent:
   - translate_to: ["zh"]
   - preserve_original_names: true
 - output:
-  - s3_bucket: (from config)
+  - s3_bucket: "NEWS_AGENT_S3_BUCKET_PLACEHOLDER"
   - s3_key_prefix: "collections/{date}/"
   - format: "json"
 
@@ -59,7 +59,7 @@ Check the collection summary:
 Construct the task configuration for the Publisher agent:
 - task_id: "publish-norway-{date}-{time_label}"
 - type: "publish_new" if is_first_run, else "merge_update"
-- source: {"type": "s3", "bucket": "{s3_bucket}", "key": "{data_key from collector result}"}
+- source: {"type": "s3", "bucket": "NEWS_AGENT_S3_BUCKET_PLACEHOLDER", "key": "{data_key from collector result}"}
 - template: "norway_daily"
 
 If type is "publish_new":
@@ -107,11 +107,15 @@ Return a JSON result with this structure:
 
 
 def create_agent() -> Agent:
+    import json
     model = BedrockModel(model_id=MODEL_ID)
+    sources_json = json.dumps(NEWS_SOURCES, indent=2)
+    prompt = SYSTEM_PROMPT.replace("NEWS_AGENT_S3_BUCKET_PLACEHOLDER", S3_BUCKET)
+    prompt += f"\n\n## CONFIGURATION VALUES\n\n- S3 bucket: `{S3_BUCKET}`\n- News sources (pass ALL of these to the Collector):\n```json\n{sources_json}\n```\n"
     return Agent(
         name="NewsOrchestrator",
         description="Workflow orchestrator for Norwegian news pipeline. Coordinates Collector and Publisher agents via A2A to produce daily Chinese-language news blog posts from Norwegian sources.",
         model=model,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=prompt,
         tools=[verify_agents, invoke_collector, invoke_publisher],
     )

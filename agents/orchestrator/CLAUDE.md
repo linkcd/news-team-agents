@@ -12,7 +12,7 @@ This agent is NOT general-purpose — it encodes the specific business logic for
 
 - **Runtime ID**: `newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
 - **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
-- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent))`
+- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))`
 - **Region**: eu-west-1
 
 ## Interface
@@ -146,10 +146,15 @@ Blog target:
 
 | Tool | Purpose |
 |------|---------|
-| `invoke_collector(task_config)` | Sends A2A `message/send` to Collector via boto3 `invoke_agent_runtime`. Parses A2A task response (artifacts/status). |
-| `invoke_publisher(task_config)` | Sends A2A `message/send` to Publisher via boto3 `invoke_agent_runtime`. Parses A2A task response (artifacts/status). |
+| `invoke_collector(task_config)` | Invokes Collector via strands `A2AAgent` with SSE streaming and SigV4 auth. Parses JSON result from agent response text. |
+| `invoke_publisher(task_config)` | Invokes Publisher via strands `A2AAgent` with SSE streaming and SigV4 auth. Parses JSON result from agent response text. |
+| `verify_agents()` | Lightweight reachability check via boto3 `invoke_agent_runtime` (non-streaming ping). |
 
-Both tools construct a JSON-RPC 2.0 `message/send` payload wrapping the task config as an A2A data Part, invoke the target runtime with SigV4 auth, and parse the A2A response (completed/failed status + artifact data).
+Both invoke tools use the shared `a2a_client.invoke_a2a()` which:
+1. Builds the runtime URL via `bedrock_agentcore.runtime.build_runtime_url`
+2. Signs requests with `SigV4HTTPXAuth` (custom `httpx.Auth` in `tools/sigv4_auth.py`)
+3. Sends the task config as a prompt to `A2AAgent` with SSE streaming
+4. Parses the structured JSON result from the agent's text response
 
 ## Environment Variables
 
@@ -166,9 +171,8 @@ Both tools construct a JSON-RPC 2.0 `message/send` payload wrapping the task con
 
 ## Timeout Policy
 
-- Collector invocation: 10 minute timeout
-- Publisher invocation: 5 minute timeout
-- On timeout: treat as error, retry once for Collector, no retry for Publisher
+- HTTP read timeout: 120s per SSE event (streaming resets this on each event, so long-running tasks stay alive)
+- On error: retry once for Collector, no retry for Publisher (git state may be inconsistent)
 
 ## Development
 

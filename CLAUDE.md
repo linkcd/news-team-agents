@@ -18,7 +18,7 @@ Three independent AgentCore runtimes, each a standalone subfolder with its own s
 
 4. **GitHub Action** (in hexo-blog repo) - Triggers on push, runs hexo deploy to GitHub Pages.
 
-Communication: A2A protocol (Agent-to-Agent) over boto3 `invoke_agent_runtime` with SigV4 auth. JSON-RPC 2.0 `message/send` for control flow. S3 for bulk data passing between agents.
+Communication: A2A protocol (Agent-to-Agent) via strands `A2AAgent` client with SSE streaming and SigV4 auth over HTTPS. S3 for bulk data passing between agents.
 Scheduling: EventBridge (every 6h: 05:00, 11:00, 17:00, 23:00 UTC) -> Lambda -> Orchestrator.
 Model: Claude Sonnet 4 via Amazon Bedrock (global inference profile: `global.anthropic.claude-sonnet-4-6`).
 AWS Region: `eu-west-1` for all deployments.
@@ -89,8 +89,9 @@ news-agent/
 ## Tech Stack
 
 - Python 3.12, Strands Agents SDK
-- AgentCore (Container build type, A2A protocol)
-- A2A protocol (Agent-to-Agent, v1.0) via `bedrock-agentcore[a2a]` + `strands-agents[a2a]`
+- AgentCore (Container build type, A2A protocol with SSE streaming)
+- A2A client: strands `A2AAgent` + `a2a-sdk` `ClientConfig` + custom `SigV4HTTPXAuth` (httpx auth)
+- A2A server: `bedrock-agentcore[a2a]` `serve_a2a()` + `strands-agents[a2a]` `StrandsA2AExecutor`
 - CDK (TypeScript, managed by agentcore CLI) for infrastructure
 - Libraries: feedparser, trafilatura, httpx, gitpython, jinja2
 - AWS Region: `eu-west-1` (all resources)
@@ -173,7 +174,7 @@ pytest tests/
 - **Publisher**: Deployed (A2A). Runtime ID: `newspublisher_NewsPublisher-jF5YE229x9`
 - **Orchestrator**: Deployed (A2A). Runtime ID: `newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
 - **S3 bucket**: `news-agent-data-548129671048` (eu-west-1, 7-day lifecycle)
-- **All agents**: Using A2A protocol with `serve_a2a(StrandsA2AExecutor(agent))`
+- **All agents**: Using A2A protocol with `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))`
 
 ## AgentCore Project Layout
 
@@ -186,7 +187,7 @@ agents/<name>/
 │   ├── aws-targets.json        # Deployment targets [{name, account, region}]
 │   └── cdk/                    # CDK stack (TypeScript) — do NOT modify manually
 ├── app/<AgentName>/            # Production code (this gets containerized)
-│   ├── main.py                 # Entrypoint: serve_a2a(StrandsA2AExecutor(agent))
+│   ├── main.py                 # Entrypoint: serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))
 │   ├── agent.py                # Agent factory: system prompt + tools
 │   ├── config.py               # MODEL_ID, constants (env var overridable)
 │   ├── tools/                  # @tool decorated functions
@@ -211,7 +212,7 @@ agents/<name>/
 2. **Write tests** in `tests/` — mock external deps, test tool input/output contracts
 3. **Run tests**: `python3 -m pytest tests/ -v`
 4. **Write agent.py** — system prompt guiding the LLM through the pipeline + register tools
-5. **Write main.py** — `serve_a2a(StrandsA2AExecutor(agent))` entrypoint
+5. **Write main.py** — `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))` entrypoint
 6. **Generate lock file**: `cd app/<AgentName> && uv lock`
 7. **Deploy**: `agentcore deploy -y` (builds container via CodeBuild, creates/updates runtime)
 8. **Verify**: `agentcore invoke '{"task": {...}}' --stream`
