@@ -92,11 +92,23 @@ This deploys:
 
 ### 3. Store the GitHub token
 
+Generate a GitHub Personal Access Token (fine-grained):
+
+1. Go to https://github.com/settings/tokens?type=beta
+2. Click **Generate new token**
+3. Set **Token name** (e.g., `news-agent-publisher`)
+4. Set **Expiration** (recommended: 90 days)
+5. Under **Repository access**, select **Only select repositories** → `claw-lu/hexo-blog`
+6. Under **Permissions → Repository permissions**, grant:
+   - **Contents**: Read and write (for git push)
+   - **Metadata**: Read-only (required by default)
+7. Click **Generate token** and copy the value
+
+Then store it as an AgentCore Identity credential:
+
 ```bash
 agentcore add credential --name github-token --api-key <GITHUB_PAT>
 ```
-
-The PAT needs write access to the target repository (e.g., `claw-lu/hexo-blog`).
 
 ### 4. Verify deployment
 
@@ -215,6 +227,20 @@ Verify the CDK stack's `addToPolicy` statement matches the bucket name. Redeploy
 
 **Credential not found:**
 Run `agentcore add credential --name github-token --api-key <PAT>` to store the token value.
+
+**"Workload access token has not been set":**
+Callers must pass `runtimeUserId` when invoking via `invoke_agent_runtime`. This is required for AgentCore Identity to issue a workload token for credential retrieval. Example:
+```python
+client.invoke_agent_runtime(
+    agentRuntimeArn=PUBLISHER_ARN,
+    runtimeSessionId=session_id,
+    runtimeUserId="orchestrator",  # Required for AgentCore Identity
+    payload=json.dumps(payload),
+)
+```
+
+**"Write access to repository not granted" (HTTP 403):**
+The GitHub PAT stored in the credential doesn't have write access to the target repo. Fine-grained tokens targeting a different account require approval from the resource owner (Settings → Personal access tokens → Pending requests).
 
 **View runtime logs:**
 ```bash
