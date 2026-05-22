@@ -45,13 +45,14 @@ def test_format_post_norway_daily_creates_valid_markdown():
         "day_summary": "今天的主要新闻包括议会通过移民法案和石油基金创新高。",
     })
 
-    result = format_post(
+    raw = format_post(
         items=items,
         template="norway_daily",
         editorial_config=editorial_config,
         date="2026-05-21",
         time="05:00:00",
     )
+    result = json.loads(raw)
 
     assert result["status"] == "success"
     content = result["content"]
@@ -76,13 +77,14 @@ def test_format_post_generic_creates_simple_post():
         "categories": ["页面"],
     })
 
-    result = format_post(
+    raw = format_post(
         items="[]",
         template="generic_post",
         editorial_config=editorial_config,
         date="2026-05-21",
         time="05:00:00",
     )
+    result = json.loads(raw)
 
     assert result["status"] == "success"
     content = result["content"]
@@ -93,13 +95,14 @@ def test_format_post_generic_creates_simple_post():
 def test_format_post_unknown_template_returns_error():
     from tools.formatter import format_post
 
-    result = format_post(
+    raw = format_post(
         items="[]",
         template="nonexistent_template",
         editorial_config="{}",
         date="2026-05-21",
         time="05:00:00",
     )
+    result = json.loads(raw)
 
     assert result["status"] == "error"
     assert "template" in result["error"].lower()

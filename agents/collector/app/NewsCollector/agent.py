@@ -1,3 +1,4 @@
+from botocore.config import Config as BotoConfig
 from strands import Agent
 from strands.models import BedrockModel
 
@@ -109,7 +110,10 @@ Each updated_item:
 
 
 def create_agent() -> Agent:
-    model = BedrockModel(model_id=MODEL_ID)
+    model = BedrockModel(
+        model_id=MODEL_ID,
+        boto_client_config=BotoConfig(read_timeout=300, connect_timeout=10),
+    )
     return Agent(
         name="NewsCollector",
         description="General-purpose web content collection agent. Fetches RSS feeds and webpages, deduplicates by URL, consolidates related articles into topics, translates/summarizes, and writes structured JSON output to S3.",

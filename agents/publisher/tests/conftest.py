@@ -11,10 +11,14 @@ strands_mock.tool = lambda fn: fn
 sys.modules["strands"] = strands_mock
 sys.modules["strands.models"] = MagicMock()
 
-# Stub out boto3 for testing
+# Stub out boto3 and botocore for testing
 if "boto3" not in sys.modules:
     boto3_mock = MagicMock()
     sys.modules["boto3"] = boto3_mock
+
+botocore_mock = MagicMock()
+sys.modules["botocore"] = botocore_mock
+sys.modules["botocore.config"] = botocore_mock.config
 
 # Stub out git (gitpython) for testing — per-test patches override this
 if "git" not in sys.modules:

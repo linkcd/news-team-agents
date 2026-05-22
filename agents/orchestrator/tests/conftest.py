@@ -18,8 +18,12 @@ agentcore_mock = MagicMock()
 sys.modules["bedrock_agentcore"] = agentcore_mock
 sys.modules["bedrock_agentcore.runtime"] = agentcore_mock.runtime
 
-# Stub out boto3 for testing (not installed in test env)
+# Stub out boto3 and botocore for testing (not installed in test env)
 boto3_mock = MagicMock()
 sys.modules["boto3"] = boto3_mock
+
+botocore_mock = MagicMock()
+sys.modules["botocore"] = botocore_mock
+sys.modules["botocore.config"] = botocore_mock.config
 
 import pytest

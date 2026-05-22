@@ -1,3 +1,4 @@
+from botocore.config import Config as BotoConfig
 from strands import Agent
 from strands.models import BedrockModel
 
@@ -82,7 +83,10 @@ When generating a day summary (今日综述):
 
 
 def create_agent() -> Agent:
-    model = BedrockModel(model_id=MODEL_ID)
+    model = BedrockModel(
+        model_id=MODEL_ID,
+        boto_client_config=BotoConfig(read_timeout=300, connect_timeout=10),
+    )
     return Agent(
         name="NewsPublisher",
         description="General-purpose editorial and publishing agent. Formats content into blog posts, merges new content into existing posts, rewrites pages, and pushes changes to Git repositories.",

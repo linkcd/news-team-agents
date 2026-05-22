@@ -1,125 +1,90 @@
-"""Tests for A2A Agent Card discovery."""
+"""Tests for A2A agent discovery (reachability check)."""
 
 import json
-import sys
 from unittest.mock import MagicMock
 
 import pytest
 
+from tools import a2a_client
 
-@pytest.fixture
-def mock_boto3_client():
-    boto3_mod = sys.modules["boto3"]
-    client = MagicMock()
-    boto3_mod.client.return_value = client
-    yield client
-    boto3_mod.reset_mock()
+
+@pytest.fixture(autouse=True)
+def client():
+    mock = MagicMock()
+    a2a_client._discovery_client = mock
+    return mock
+
+
+def _a2a_success_response():
+    body = {"result": {"status": {"state": "completed"}}}
+    return {"response": MagicMock(read=MagicMock(return_value=json.dumps(body).encode()))}
+
+
+def _a2a_error_response(msg="unsupported"):
+    body = {"error": {"code": -32601, "message": msg}}
+    return {"response": MagicMock(read=MagicMock(return_value=json.dumps(body).encode()))}
 
 
 class TestAgentDiscovery:
-    def test_discover_agent_returns_agent_card(self, mock_boto3_client):
-        """Fetches agent card from runtime's /.well-known/agent-card.json endpoint."""
+    def test_discover_agent_returns_available_on_success(self, client):
+        """Returns available=True when runtime responds to message/send."""
         from tools.discovery import discover_agent
 
-        agent_card = {
-            "name": "NewsCollector",
-            "description": "General-purpose web content collection agent",
-            "version": "0.1.0",
-            "capabilities": {"streaming": True},
-            "skills": [
-                {
-                    "id": "content-collection",
-                    "name": "Content Collection",
-                    "description": "Fetches and consolidates web content",
-                }
-            ],
-        }
-
-        mock_boto3_client.invoke_agent_runtime.return_value = {
-            "response": MagicMock(
-                read=MagicMock(return_value=json.dumps(agent_card).encode())
-            )
-        }
+        client.invoke_agent_runtime.return_value = _a2a_success_response()
 
         result = discover_agent(
             "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j"
         )
 
-        assert result["name"] == "NewsCollector"
-        assert result["capabilities"]["streaming"] is True
-        assert len(result["skills"]) == 1
+        assert result["available"] is True
 
-        call_kwargs = mock_boto3_client.invoke_agent_runtime.call_args[1]
+        call_kwargs = client.invoke_agent_runtime.call_args[1]
         payload = json.loads(call_kwargs["payload"])
-        assert payload["method"] == "agent/card"
+        assert payload["method"] == "message/send"
 
-    def test_discover_agent_returns_none_on_failure(self, mock_boto3_client):
-        """Returns None if agent card fetch fails."""
+    def test_discover_agent_returns_unavailable_on_exception(self, client):
+        """Returns available=False with error if invocation raises."""
         from tools.discovery import discover_agent
 
-        mock_boto3_client.invoke_agent_runtime.side_effect = Exception("Connection refused")
+        client.invoke_agent_runtime.side_effect = Exception("Connection refused")
 
         result = discover_agent(
             "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/nonexistent"
         )
 
-        assert result is None
+        assert result["available"] is False
+        assert "Connection refused" in result["error"]
 
-    def test_discover_agent_returns_none_on_invalid_response(self, mock_boto3_client):
-        """Returns None if response is not valid JSON."""
+    def test_discover_agent_returns_unavailable_on_a2a_error(self, client):
+        """Returns available=False if A2A response contains an error."""
         from tools.discovery import discover_agent
 
-        mock_boto3_client.invoke_agent_runtime.return_value = {
-            "response": MagicMock(
-                read=MagicMock(return_value=b"not json")
-            )
-        }
+        client.invoke_agent_runtime.return_value = _a2a_error_response("method not found")
 
         result = discover_agent(
             "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/test"
         )
 
-        assert result is None
+        assert result["available"] is False
+        assert "method not found" in result["error"]
 
-    def test_verify_agents_checks_both_downstream_agents(self, mock_boto3_client):
+    def test_verify_agents_checks_both_downstream_agents(self, client):
         """verify_agents checks both collector and publisher are reachable."""
         from tools.discovery import verify_agents
 
-        collector_card = {
-            "name": "NewsCollector",
-            "version": "0.1.0",
-            "skills": [{"id": "content-collection", "name": "Content Collection"}],
-        }
-        publisher_card = {
-            "name": "NewsPublisher",
-            "version": "0.1.0",
-            "skills": [{"id": "editorial-publishing", "name": "Editorial Publishing"}],
-        }
-
-        mock_boto3_client.invoke_agent_runtime.side_effect = [
-            {"response": MagicMock(read=MagicMock(return_value=json.dumps(collector_card).encode()))},
-            {"response": MagicMock(read=MagicMock(return_value=json.dumps(publisher_card).encode()))},
-        ]
+        client.invoke_agent_runtime.return_value = _a2a_success_response()
 
         result = verify_agents()
 
         assert result["collector"]["available"] is True
-        assert result["collector"]["name"] == "NewsCollector"
         assert result["publisher"]["available"] is True
-        assert result["publisher"]["name"] == "NewsPublisher"
 
-    def test_verify_agents_reports_unavailable_agent(self, mock_boto3_client):
-        """verify_agents reports agent as unavailable if discovery fails."""
+    def test_verify_agents_reports_unavailable_agent(self, client):
+        """verify_agents reports agent as unavailable if invocation fails."""
         from tools.discovery import verify_agents
 
-        collector_card = {
-            "name": "NewsCollector",
-            "version": "0.1.0",
-            "skills": [],
-        }
-
-        mock_boto3_client.invoke_agent_runtime.side_effect = [
-            {"response": MagicMock(read=MagicMock(return_value=json.dumps(collector_card).encode()))},
+        client.invoke_agent_runtime.side_effect = [
+            _a2a_success_response(),
             Exception("Publisher not deployed"),
         ]
 
@@ -127,3 +92,4 @@ class TestAgentDiscovery:
 
         assert result["collector"]["available"] is True
         assert result["publisher"]["available"] is False
+        assert "Publisher not deployed" in result["publisher"]["error"]
