@@ -40,6 +40,7 @@ def invoke_publisher(task_config: dict) -> dict:
         response = client.invoke_agent_runtime(
             agentRuntimeArn=PUBLISHER_RUNTIME_ARN,
             runtimeSessionId=session_id,
+            runtimeUserId="orchestrator",
             payload=json.dumps(a2a_payload),
         )
         body = json.loads(response["response"].read())
