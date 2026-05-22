@@ -214,68 +214,43 @@ categories: [每日新闻, 挪威]
 
 | Tool | Purpose |
 |------|---------|
-| `read_from_s3(bucket, key)` | Read source content from S3 |
-| `read_repo_file(repo, branch, path)` | Read existing file from Git repo |
-| `format_post(items, template, editorial_config)` | Render Jinja2 template to markdown |
-| `merge_posts(existing_content, new_items, updated_items, strategy)` | Deterministic merge: parse, match, insert new, update existing, renumber |
-| `git_clone(repo, branch)` | Clone repo locally |
-| `git_commit_and_push(repo_path, file_path, message)` | Commit and push changes |
+| `read_from_s3(bucket, key)` | Read collected items JSON from S3 |
+| `read_repo_file(repo, branch, path)` | Read existing file from public GitHub repo (for merge_update) |
+| `git_clone(repo, branch)` | Clone repo locally (authenticated via AgentCore Identity) |
+| `git_commit_and_push(repo_path, file_path, content, commit_message)` | Write file, commit, and push |
 
-## Templates
+The LLM writes markdown directly from the template format embedded in its system prompt — no Jinja2 rendering or deterministic merge tools. This avoids the LLM re-serializing large data through tool arguments.
 
-Templates are Jinja2 files stored in `templates/`:
+## Authentication
 
-| Template | Purpose |
-|----------|---------|
-| `norway_daily.md.j2` | Norwegian daily news post (sections: domestic, international, business) |
-| `generic_post.md.j2` | Generic blog post (title, body, tags) |
-
-New templates can be added for new use cases without changing agent code.
-
-## Merge Strategy Options
-
-| Option | Behavior |
-|--------|----------|
-| `new_items: "append_per_section"` | Add new topics at end of matching section |
-| `new_items: "prepend_per_section"` | Add new topics at start of matching section |
-| `updated_items: "replace_summary_and_add_source"` | Replace summary, add new source URL, add changelog |
-| `renumber: true` | Renumber all items sequentially after merge |
-| `regenerate_day_summary: true` | LLM regenerates the 今日综述 section covering all topics |
+Git operations use AgentCore Identity (`@requires_api_key(provider_name="github-token")`) to obtain the GitHub token at runtime. The invoking agent must pass `runtime_user_id` in the A2A request header (`X-Amzn-Bedrock-AgentCore-Runtime-User-Id`) for the token to be issued.
 
 ## IAM Permissions Required
 
-- `bedrock:InvokeModel` (for summary generation, rewrites, topic matching during merge)
+- `bedrock:InvokeModel` (for markdown generation, summary writing, content merging)
 - `s3:GetObject` on source bucket
-- `secretsmanager:GetSecretValue` (GitHub token for git push)
-- Outbound internet (git push)
-
-## Secrets
-
-| Secret | Purpose |
-|--------|---------|
-| `news-agent/github-token` | GitHub bot PAT for git push (write access) |
+- Outbound internet (git push, GitHub raw file reads)
+- AgentCore Identity: `github-token` API key provider configured
 
 ## Tech Stack
 
 - Python 3.12, Strands Agents SDK (with A2A support)
-- bedrock-agentcore[a2a] (A2A runtime serving)
+- bedrock-agentcore[a2a] (A2A runtime serving + Identity for GitHub token)
 - gitpython (git operations)
-- jinja2 (template rendering)
-- boto3 (S3 reads, Secrets Manager)
-- httpx (for reading files from public repos if needed)
+- boto3 (S3 reads)
+- httpx (reading files from public repos)
 
 ## Development
 
 ```bash
 agentcore dev                    # local development
-python3 -m pytest tests/ -v      # run unit tests (19 tests)
+python3 -m pytest tests/ -v      # run unit tests (20 tests)
 agentcore deploy -y              # deploy to AWS
 agentcore invoke '{"task": {...}}' --stream  # invoke
 ```
 
 ## Design Principles
 
-- **Deterministic merge for structural work**: Parsing markdown, inserting items, renumbering, adding sources — this is Python code, not LLM reasoning.
-- **LLM for creative/matching work**: Summary generation, topic matching (finding which existing item a new article updates), rewrites.
-- **Template-driven formatting**: Post structure comes from Jinja2 templates. Ensures consistent output.
+- **LLM writes markdown directly**: No intermediate Jinja2 rendering or tool-based formatting. The LLM reads structured JSON from S3 and produces the final markdown in one pass.
+- **Minimal data through tool arguments**: Tools read/write data; the LLM holds the content in context and produces output directly to `git_commit_and_push`.
 - **Git as deployment trigger**: Publisher pushes to Git. Deployment (hexo, Jekyll, etc.) is handled by CI/CD in the target repo.
