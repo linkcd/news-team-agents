@@ -4,14 +4,7 @@ import datetime
 
 from strands import tool
 
-SECTION_MAP = {
-    "domestic": "国内新闻",
-    "international": "国际新闻",
-    "business": "财经新闻",
-}
-
-SECTION_ORDER = ["domestic", "international", "business"]
-REVERSE_SECTION_MAP = {v: k for k, v in SECTION_MAP.items()}
+from tools.sections import SECTION_MAP, SECTION_ORDER, REVERSE_SECTION_MAP
 
 
 def _parse_post(content: str) -> dict:
@@ -148,7 +141,7 @@ def _rebuild_post(parsed: dict, updated_time: str) -> str:
 
 
 @tool
-def merge_posts(existing_content: str, new_items: str, updated_items: str, strategy: str) -> dict:
+def merge_posts(existing_content: str, new_items: str, updated_items: str, strategy: str) -> str:
     """Merge new and updated items into an existing blog post.
 
     Deterministic merge: parses existing markdown, inserts new items at correct positions,
@@ -164,7 +157,7 @@ def merge_posts(existing_content: str, new_items: str, updated_items: str, strat
         Dict with status, merged content, and counts (new_items_added, existing_items_updated, total_items)
     """
     if not existing_content.strip():
-        return {"status": "error", "error": "Cannot merge into empty existing content. Use format_post for new posts."}
+        return json.dumps({"status": "error", "error": "Cannot merge into empty existing content. Use format_post for new posts."})
 
     try:
         parsed = _parse_post(existing_content)
@@ -227,12 +220,12 @@ def merge_posts(existing_content: str, new_items: str, updated_items: str, strat
         updated_time = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M")
         content = _rebuild_post(parsed, updated_time)
 
-        return {
+        return json.dumps({
             "status": "success",
             "content": content,
             "new_items_added": items_added,
             "existing_items_updated": items_updated,
             "total_items": total,
-        }
+        }, ensure_ascii=False)
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return json.dumps({"status": "error", "error": str(e)})

@@ -80,6 +80,7 @@ categories: [每日新闻, 挪威]
         strategy=strategy,
     )
 
+    result = json.loads(result)
     assert result["status"] == "success"
     content = result["content"]
     # New domestic item appended after existing domestic items
@@ -161,6 +162,7 @@ categories: [每日新闻, 挪威]
         strategy=strategy,
     )
 
+    result = json.loads(result)
     assert result["status"] == "success"
     content = result["content"]
     # Summary replaced
@@ -195,12 +197,13 @@ def test_merge_posts_handles_empty_existing_content():
         }
     ])
 
-    result = merge_posts(
+    raw = merge_posts(
         existing_content="",
         new_items=new_items,
         updated_items="[]",
         strategy='{"new_items": "append_per_section", "updated_items": "replace_summary_and_add_source", "renumber": true, "regenerate_day_summary": false}',
     )
+    result = json.loads(raw)
 
     assert result["status"] == "error"
     assert "existing content" in result["error"].lower()

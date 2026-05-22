@@ -9,12 +9,15 @@ import pytest
 
 @pytest.fixture
 def mock_boto3_client():
-    """Patch the boto3 mock's client to return a controllable mock client."""
-    boto3_mod = sys.modules["boto3"]
+    """Provide a unified mock client that all a2a_client module clients delegate to."""
+    from tools import a2a_client
     client = MagicMock()
-    boto3_mod.client.return_value = client
+    # Point all module-level clients to the same mock
+    a2a_client._discovery_client = client
+    a2a_client._collector_client = client
+    a2a_client._publisher_client = client
     yield client
-    boto3_mod.reset_mock()
+    client.reset_mock()
 
 
 def make_a2a_success_response(data: dict) -> dict:

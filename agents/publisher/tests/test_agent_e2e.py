@@ -51,6 +51,7 @@ def test_publish_new_flow_integration(sample_collection_data):
         time="05:00:00",
     )
 
+    format_result = json.loads(format_result)
     assert format_result["status"] == "success"
     assert "议会通过新移民法案" in format_result["content"]
     assert "石油基金创历史新高" in format_result["content"]
@@ -106,6 +107,7 @@ def test_merge_update_flow_integration(sample_collection_data, sample_existing_p
         strategy=strategy,
     )
 
+    result = json.loads(result)
     assert result["status"] == "success"
     content = result["content"]
     # Original item preserved

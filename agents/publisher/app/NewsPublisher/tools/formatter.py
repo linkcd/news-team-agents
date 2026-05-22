@@ -4,15 +4,9 @@ import os
 from jinja2 import Environment, FileSystemLoader
 from strands import tool
 
+from tools.sections import SECTION_MAP, SECTION_ORDER
+
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
-
-SECTION_MAP = {
-    "domestic": "国内新闻",
-    "international": "国际新闻",
-    "business": "财经新闻",
-}
-
-SECTION_ORDER = ["domestic", "international", "business"]
 
 
 def _build_sections(items: list) -> list[dict]:
@@ -51,7 +45,7 @@ def _build_sections(items: list) -> list[dict]:
 
 
 @tool
-def format_post(items: str, template: str, editorial_config: str, date: str, time: str) -> dict:
+def format_post(items: str, template: str, editorial_config: str, date: str, time: str) -> str:
     """Render a blog post from items using a Jinja2 template.
 
     Args:
@@ -71,7 +65,7 @@ def format_post(items: str, template: str, editorial_config: str, date: str, tim
         )
         template_file = f"{template}.md.j2"
         if not os.path.exists(os.path.join(TEMPLATE_DIR, template_file)):
-            return {"status": "error", "error": f"Template not found: {template_file}"}
+            return json.dumps({"status": "error", "error": f"Template not found: {template_file}"})
 
         tmpl = env.get_template(template_file)
         parsed_items = json.loads(items)
@@ -95,6 +89,6 @@ def format_post(items: str, template: str, editorial_config: str, date: str, tim
         else:
             rendered = tmpl.render(date=date, **config)
 
-        return {"status": "success", "content": rendered}
+        return json.dumps({"status": "success", "content": rendered}, ensure_ascii=False)
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return json.dumps({"status": "error", "error": str(e)})
