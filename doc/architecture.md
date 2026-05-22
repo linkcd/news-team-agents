@@ -234,12 +234,12 @@ Bulk article data passes via S3, not through the Orchestrator's LLM context:
 
 | Resource | Purpose |
 |----------|---------|
-| 3x AgentCore Runtime | One per agent (Container build, Python 3.11) |
+| 3x AgentCore Runtime | One per agent (Container build, Python 3.12) |
 | 3x ECR Repository | Docker images for each agent |
-| 1x EventBridge Rule | `cron(0 5,11,17,23 * * ? *)` — every 6h |
-| 1x Lambda | EventBridge -> invoke orchestrator |
-| 1x S3 Bucket | Intermediate data (`news-agent-data`, 7-day lifecycle) |
-| 1x Secrets Manager Secret | GitHub bot token (Publisher write access) |
+| 1x EventBridge Rule | `cron(0 5,11,17,23 * * ? *)` — every 6h (in orchestrator CDK stack) |
+| 1x Lambda (`news-agent-schedule-invoker`) | Fire-and-forget trigger: sends A2A message to orchestrator, returns immediately (30s timeout) |
+| 1x S3 Bucket | Intermediate data (`news-agent-data-548129671048`, 7-day lifecycle) |
+| 1x AgentCore Identity credential | `github-token` API key provider (Publisher git push) |
 | 3x IAM Role | Per-runtime execution roles |
 
 ### IAM Permissions
@@ -248,14 +248,14 @@ Bulk article data passes via S3, not through the Orchestrator's LLM context:
 |------|-------------|
 | Orchestrator | `bedrock-agentcore:InvokeAgentRuntime` on Collector + Publisher, `bedrock:InvokeModel` |
 | Collector | `bedrock:InvokeModel`, `s3:PutObject` on data bucket, outbound internet (RSS, GitHub public API) |
-| Publisher | `bedrock:InvokeModel`, `s3:GetObject` on data bucket, `secretsmanager:GetSecretValue`, outbound internet (git push) |
+| Publisher | `bedrock:InvokeModel`, `s3:GetObject` on data bucket, outbound internet (git push). GitHub token via AgentCore Identity (`requires_api_key`). |
 | Lambda (invoker) | `bedrock-agentcore:InvokeAgentRuntime` on Orchestrator |
 
-### Secrets
+### Secrets / Credentials
 
-| Secret | Used By | Content |
-|--------|---------|---------|
-| `news-agent/github-token` | Publisher | GitHub bot PAT for git push (write access to claw-lu/hexo-blog) |
+| Credential | Used By | Mechanism |
+|------------|---------|-----------|
+| `github-token` | Publisher | AgentCore Identity API key provider. Injected via `@requires_api_key` decorator. Requires `runtime_user_id` header from caller. |
 
 ### S3 Bucket Structure
 

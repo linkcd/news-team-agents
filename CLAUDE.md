@@ -19,7 +19,7 @@ Three independent AgentCore runtimes, each a standalone subfolder with its own s
 4. **GitHub Action** (in hexo-blog repo) - Triggers on push, runs hexo deploy to GitHub Pages.
 
 Communication: A2A protocol (Agent-to-Agent) via strands `A2AAgent` client with SSE streaming and SigV4 auth over HTTPS. S3 for bulk data passing between agents.
-Scheduling: EventBridge (every 6h: 05:00, 11:00, 17:00, 23:00 UTC) -> Lambda -> Orchestrator.
+Scheduling: EventBridge `cron(0 5,11,17,23 * * ? *)` -> Lambda (fire-and-forget) -> Orchestrator. Provisioned in orchestrator's CDK stack.
 Model: Claude Sonnet 4 via Amazon Bedrock (global inference profile: `global.anthropic.claude-sonnet-4-6`).
 AWS Region: `eu-west-1` for all deployments.
 
@@ -68,7 +68,7 @@ news-agent/
 - **Collector and Publisher are general-purpose**: Their interfaces accept arbitrary tasks. They know nothing about Norwegian news or this specific workflow.
 - **Orchestrator is domain-specific**: It encodes the business logic (which feeds, what schedule, what post format).
 - **Each agent subfolder is standalone**: Own `src/` for code, `infra/` for CDK, `tests/` for evaluation. Each can be developed, deployed, and evaluated independently.
-- **Cross-cutting infra lives in orchestrator**: EventBridge scheduling, shared S3 bucket, and IAM roles are deployed from the orchestrator's `infra/`.
+- **Cross-cutting infra lives in orchestrator's CDK stack**: EventBridge rule, invoker Lambda, IAM permissions for downstream agents.
 - **Data flows through S3, not LLM context**: Bulk content never passes through the Orchestrator's context window.
 - **Deterministic tools for structural work**: Multi-run merge, dedup, renumbering are Python code. LLM only does creative work (translation, summarization, topic consolidation).
 - **Topic-based content model**: Multiple articles about the same event → one consolidated topic. Reduces noise, produces richer summaries with multiple sources.
@@ -96,7 +96,7 @@ news-agent/
 - Libraries: feedparser, trafilatura, httpx, gitpython
 - AWS Region: `eu-west-1` (all resources)
 - Model: `global.anthropic.claude-sonnet-4-6` (global inference profile, works in any region)
-- AWS: EventBridge, Lambda, S3, Secrets Manager, IAM
+- AWS: EventBridge, Lambda, S3, AgentCore Identity, IAM
 - GitHub Actions for hexo deploy
 
 ## Development Methodology: Test-Driven Development (TDD)
