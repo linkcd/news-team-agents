@@ -151,9 +151,13 @@ cd agents/collector && agentcore dev
 cd agents/publisher && agentcore dev
 cd agents/orchestrator && agentcore dev
 
-# Deploy agent to AWS (uses agentcore CLI + CDK internally)
+# Deploy agents to AWS (order matters: Collector and Publisher first, then Orchestrator)
+# Orchestrator's CDK stack references Collector/Publisher runtime ARNs, so they must exist first.
 cd agents/collector && agentcore deploy -y
 cd agents/publisher && agentcore deploy -y
+# After Collector + Publisher are deployed, update runtime ARNs in:
+#   agents/orchestrator/app/NewsOrchestrator/config.py
+#   agents/orchestrator/agentcore/cdk/lib/cdk-stack.ts
 cd agents/orchestrator && agentcore deploy -y
 
 # Invoke deployed agent
