@@ -34,12 +34,12 @@ Lambda (eventbridge_invoker)
 | Output: S3 file    |   | Output: git push    |
 |                    |   |                     |
 | - Dedup (GitHub)   |   | - Read from S3      |
-| - RSS/web fetch    |   | - Format (Jinja2)   |
-| - Extract content  |   | - Merge (code tool) |
-| - Consolidate      |   | - Summary (LLM)     |
-|   topics (LLM)     |   | - Update existing   |
-| - Translate/summ.  |   |   items (LLM match) |
-| - Write to S3      |   | - Git push          |
+| - RSS/web fetch    |   | - LLM writes        |
+| - Extract content  |   |   markdown directly |
+| - Consolidate      |   | - Read existing post|
+|   topics (LLM)     |   |   (for merge)       |
+| - Translate/summ.  |   | - Git clone + push  |
+| - Write to S3      |   |                     |
 +--------------------+   +---------------------+
         |                         |
         v                         v
@@ -97,14 +97,13 @@ Orchestrator:
 
 Publisher:
   12. Read collected topics from S3 (new_items + updated_items)
-  13. Clone/pull blog repo
-  14. If today's post exists:
-      - Append new_items to correct sections
-      - Update existing items with new summaries + sources + changelog
-      - Renumber, regenerate day summary
-  15. If no post: create fresh from template
-  16. Git commit + push
-  17. Return {status, commit_sha} to Orchestrator
+  13. If merge_update: read existing post from GitHub (public raw URL)
+  14. LLM writes full markdown directly (or modifies existing):
+      - Formats items into sections (domestic, international, business)
+      - Writes 300-word day summary
+      - For merge: inserts new items, updates existing, renumbers
+  15. Git clone (authenticated via AgentCore Identity) + commit + push
+  16. Return {status, commit_sha} to Orchestrator
 
 GitHub Action:
   18. Triggered by push to main
@@ -148,12 +147,9 @@ Task types:
 
 Key parameters:
 - `source` - Where to read content (S3 key with new_items + updated_items)
-- `template` - Which Jinja2 template to use
 - `output` - Target repo, branch, file path
-- `editorial` - Summary generation config
-- `merge_strategy.new_items` - How to insert new topics (append/prepend per section)
-- `merge_strategy.updated_items` - How to handle topic updates (replace summary + add source + changelog)
-- `merge_strategy.regenerate_day_summary` - Whether to regenerate the overall summary
+- `editorial` - Summary generation config (day_summary_words, regenerate_day_summary)
+- `commit_message` - Git commit message
 
 **Output**: Status, commit SHA, new items added, existing items updated, total items in post.
 
@@ -333,7 +329,6 @@ Each agent is evaluated independently:
 | Article Extraction | trafilatura |
 | HTTP Client | httpx |
 | Git Operations | gitpython |
-| Template Engine | Jinja2 |
 | Blog Engine | Hexo (in GitHub Action, NOT in agent containers) |
 | Scheduling | Amazon EventBridge |
 | Data Passing | Amazon S3 |
@@ -355,7 +350,7 @@ Each agent is evaluated independently:
 | Data passing | S3 intermediate storage | Avoids large payloads in Orchestrator LLM context; provides audit trail |
 | Dedup ownership | Collector reads existing post from GitHub | Collector is self-contained; Orchestrator stays lightweight |
 | Hexo deployment | GitHub Action (not in Publisher container) | Decouples LLM work from build toolchain; easier to debug |
-| Multi-run merge | Deterministic Python tool + LLM for matching/summary | Structural manipulation (insert, renumber) is code; creative work (matching, summarizing) is LLM |
+| Publisher formatting | LLM writes markdown directly (no Jinja2 templates) | Avoids LLM re-serializing large data through tool arguments; simpler pipeline, faster execution |
 | Article extraction | trafilatura (browser as future fallback) | Norwegian news sites serve server-rendered HTML; fast and lightweight |
 | Failed extraction | Skip silently | 6h window + 4 runs/day gives natural resilience; no hard threshold needed |
 | Model | Claude Sonnet 4 | Strong multilingual for Norwegian→Chinese translation + good at semantic similarity |

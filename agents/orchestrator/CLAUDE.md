@@ -147,7 +147,7 @@ Blog target:
 | Tool | Purpose |
 |------|---------|
 | `invoke_collector(task_config)` | Invokes Collector via strands `A2AAgent` with SSE streaming and SigV4 auth. Parses JSON result from agent response text. |
-| `invoke_publisher(task_config)` | Invokes Publisher via strands `A2AAgent` with SSE streaming and SigV4 auth. Parses JSON result from agent response text. |
+| `invoke_publisher(task_config)` | Invokes Publisher via strands `A2AAgent` with SSE streaming, SigV4 auth, and `runtime_user_id="orchestrator"` (required for AgentCore Identity). |
 | `verify_agents()` | Lightweight reachability check via boto3 `invoke_agent_runtime` (non-streaming ping). |
 
 Both invoke tools use the shared `a2a_client.invoke_a2a()` which:

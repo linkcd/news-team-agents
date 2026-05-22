@@ -93,7 +93,7 @@ news-agent/
 - A2A client: strands `A2AAgent` + `a2a-sdk` `ClientConfig` + custom `SigV4HTTPXAuth` (httpx auth)
 - A2A server: `bedrock-agentcore[a2a]` `serve_a2a()` + `strands-agents[a2a]` `StrandsA2AExecutor`
 - CDK (TypeScript, managed by agentcore CLI) for infrastructure
-- Libraries: feedparser, trafilatura, httpx, gitpython, jinja2
+- Libraries: feedparser, trafilatura, httpx, gitpython
 - AWS Region: `eu-west-1` (all resources)
 - Model: `global.anthropic.claude-sonnet-4-6` (global inference profile, works in any region)
 - AWS: EventBridge, Lambda, S3, Secrets Manager, IAM
