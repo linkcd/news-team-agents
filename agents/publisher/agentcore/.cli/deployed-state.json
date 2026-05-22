@@ -1,0 +1,22 @@
+{
+  "targets": {
+    "default": {
+      "resources": {
+        "runtimes": {
+          "NewsPublisher": {
+            "runtimeId": "newspublisher_NewsPublisher-jF5YE229x9",
+            "runtimeArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9",
+            "roleArn": "arn:aws:iam::548129671048:role/AgentCore-newspublisher-d-ApplicationAgentNewsPubli-aR3CgfdgixSP"
+          }
+        },
+        "credentials": {
+          "github-token": {
+            "credentialProviderArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:token-vault/default/apikeycredentialprovider/github-token"
+          }
+        },
+        "stackName": "AgentCore-newspublisher-default",
+        "identityKmsKeyArn": "arn:aws:kms:eu-west-1:548129671048:key/dda3b8f1-84bd-4b0c-b7be-463f86849b8c"
+      }
+    }
+  }
+}
