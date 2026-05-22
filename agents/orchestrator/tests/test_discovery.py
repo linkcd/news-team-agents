@@ -33,7 +33,7 @@ class TestAgentDiscovery:
         client.invoke_agent_runtime.return_value = _a2a_success_response()
 
         result = discover_agent(
-            "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j"
+            "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-EhrHzp4oFi"
         )
 
         assert result["available"] is True

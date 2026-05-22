@@ -5,11 +5,11 @@ AWS_REGION = os.environ.get("AWS_REGION", "eu-west-1")
 
 COLLECTOR_RUNTIME_ARN = os.environ.get(
     "COLLECTOR_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j",
+    "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-EhrHzp4oFi",
 )
 PUBLISHER_RUNTIME_ARN = os.environ.get(
     "PUBLISHER_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9",
+    "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2",
 )
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "news-agent-data-548129671048")

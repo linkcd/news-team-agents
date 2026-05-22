@@ -211,7 +211,7 @@ Network mode is PUBLIC — allows outbound HTTP to RSS feeds, article URLs, and 
 
 | Resource | Value |
 |----------|-------|
-| Runtime ID | `newscollector_NewsCollector-dVHkI27O5j` |
+| Runtime ID | `newscollector_NewsCollector-EhrHzp4oFi` |
 | Region | `eu-west-1` |
 | Account | `548129671048` |
 | Stack | `AgentCore-newscollector-default` |

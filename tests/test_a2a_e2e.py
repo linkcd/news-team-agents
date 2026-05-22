@@ -10,9 +10,9 @@ import boto3
 import pytest
 
 AWS_REGION = "eu-west-1"
-COLLECTOR_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j"
-PUBLISHER_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9"
-ORCHESTRATOR_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-c0PiNh5PAN"
+COLLECTOR_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-EhrHzp4oFi"
+PUBLISHER_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2"
+ORCHESTRATOR_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-255wUd9gwc"
 
 
 @pytest.fixture

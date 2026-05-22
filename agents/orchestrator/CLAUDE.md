@@ -10,8 +10,8 @@ This agent is NOT general-purpose — it encodes the specific business logic for
 
 ## Deployment
 
-- **Runtime ID**: `newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
-- **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-c0PiNh5PAN`
+- **Runtime ID**: `newsorchestrator_NewsOrchestrator-255wUd9gwc`
+- **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-255wUd9gwc`
 - **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))`
 - **Region**: eu-west-1
 

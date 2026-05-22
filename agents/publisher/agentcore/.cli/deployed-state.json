@@ -4,9 +4,9 @@
       "resources": {
         "runtimes": {
           "NewsPublisher": {
-            "runtimeId": "newspublisher_NewsPublisher-jF5YE229x9",
-            "runtimeArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9",
-            "roleArn": "arn:aws:iam::548129671048:role/AgentCore-newspublisher-d-ApplicationAgentNewsPubli-aR3CgfdgixSP"
+            "runtimeId": "newspublisher_NewsPublisher-OZnqGfD4D2",
+            "runtimeArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2",
+            "roleArn": "arn:aws:iam::548129671048:role/AgentCore-newspublisher-d-ApplicationAgentNewsPubli-qzgca4xrnw8S"
           }
         },
         "credentials": {

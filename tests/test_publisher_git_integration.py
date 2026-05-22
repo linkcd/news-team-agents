@@ -22,7 +22,7 @@ import boto3
 import pytest
 
 AWS_REGION = "eu-west-1"
-PUBLISHER_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9"
+PUBLISHER_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2"
 TARGET_REPO = "claw-lu/hexo-blog"
 TARGET_BRANCH = "main"
 TEST_FILE_PATH = "source/_tests/agentcore-identity-test.md"

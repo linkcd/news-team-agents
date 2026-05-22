@@ -72,30 +72,36 @@ export class AgentCoreStack extends Stack {
           'bedrock-agentcore:GetAgentCard',
         ],
         resources: [
-          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j',
-          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j/*',
-          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9',
-          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-jF5YE229x9/*',
+          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-EhrHzp4oFi',
+          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-EhrHzp4oFi/*',
+          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2',
+          'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2/*',
         ],
       }));
     }
 
     // EventBridge schedule: invoke orchestrator every 6 hours
-    const orchestratorArn = 'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-c0PiNh5PAN';
+    const orchestratorRuntime = this.application.environments.get('NewsOrchestrator')!.runtime;
+    const orchestratorArn = orchestratorRuntime.runtimeArn;
 
     const invokerFn = new lambda.Function(this, 'ScheduleInvoker', {
       functionName: 'news-agent-schedule-invoker',
       runtime: lambda.Runtime.PYTHON_3_12,
       handler: 'index.handler',
       timeout: Duration.seconds(30),
+      environment: {
+        ORCHESTRATOR_RUNTIME_ARN: orchestratorArn,
+      },
       code: lambda.Code.fromInline(`
 import json
+import os
 import uuid
 import boto3
 from botocore.config import Config
 from datetime import datetime, timezone
 
 def handler(event, context):
+    runtime_arn = os.environ['ORCHESTRATOR_RUNTIME_ARN']
     client = boto3.client('bedrock-agentcore', region_name='eu-west-1',
         config=Config(read_timeout=10, connect_timeout=10))
     run_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -114,7 +120,7 @@ def handler(event, context):
     })
     try:
         client.invoke_agent_runtime(
-            agentRuntimeArn='${orchestratorArn}',
+            agentRuntimeArn=runtime_arn,
             runtimeSessionId=session_id,
             payload=payload,
         )
@@ -128,10 +134,7 @@ def handler(event, context):
 `),
     });
 
-    invokerFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['bedrock-agentcore:InvokeAgentRuntime'],
-      resources: [orchestratorArn, `${orchestratorArn}/*`],
-    }));
+    orchestratorRuntime.grantInvoke(invokerFn);
 
     new events.Rule(this, 'ScheduleRule', {
       ruleName: 'news-agent-6h-schedule',

@@ -4,9 +4,9 @@
       "resources": {
         "runtimes": {
           "NewsCollector": {
-            "runtimeId": "newscollector_NewsCollector-dVHkI27O5j",
-            "runtimeArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-dVHkI27O5j",
-            "roleArn": "arn:aws:iam::548129671048:role/AgentCore-newscollector-d-ApplicationAgentNewsColle-uwSFi62bmF5b"
+            "runtimeId": "newscollector_NewsCollector-EhrHzp4oFi",
+            "runtimeArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-EhrHzp4oFi",
+            "roleArn": "arn:aws:iam::548129671048:role/AgentCore-newscollector-d-ApplicationAgentNewsColle-QS3HCSeSHtyd"
           }
         },
         "stackName": "AgentCore-newscollector-default"

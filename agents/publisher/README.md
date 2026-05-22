@@ -211,7 +211,7 @@ uv lock
 
 | Resource | Value |
 |----------|-------|
-| Runtime ID | `newspublisher_NewsPublisher-jF5YE229x9` |
+| Runtime ID | `newspublisher_NewsPublisher-OZnqGfD4D2` |
 | Region | `eu-west-1` |
 | Account | `548129671048` |
 | Stack | `AgentCore-newspublisher-default` |

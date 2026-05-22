@@ -4,9 +4,9 @@
       "resources": {
         "runtimes": {
           "NewsOrchestrator": {
-            "runtimeId": "newsorchestrator_NewsOrchestrator-c0PiNh5PAN",
-            "runtimeArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-c0PiNh5PAN",
-            "roleArn": "arn:aws:iam::548129671048:role/AgentCore-newsorchestrato-ApplicationAgentNewsOrche-0qDU3MUWj3VR"
+            "runtimeId": "newsorchestrator_NewsOrchestrator-255wUd9gwc",
+            "runtimeArn": "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-255wUd9gwc",
+            "roleArn": "arn:aws:iam::548129671048:role/AgentCore-newsorchestrato-ApplicationAgentNewsOrche-BJoKLKguhXR2"
           }
         },
         "stackName": "AgentCore-newsorchestrator-default"
