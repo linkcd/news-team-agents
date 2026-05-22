@@ -52,8 +52,9 @@ def test_read_repo_file_handles_404():
             path="source/_posts/nonexistent.md",
         )
 
-    assert result["status"] == "not_found"
+    assert result["status"] == "success"
     assert result["content"] == ""
+    assert result["found"] is False
 
 
 def test_read_repo_file_handles_network_error():

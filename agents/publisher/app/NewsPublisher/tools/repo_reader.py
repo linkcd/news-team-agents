@@ -21,5 +21,5 @@ def read_repo_file(repo: str, branch: str, path: str) -> dict:
         return {"status": "success", "content": response.text}
     except Exception as e:
         if "404" in str(e):
-            return {"status": "not_found", "content": ""}
+            return {"status": "success", "content": "", "found": False}
         return {"status": "error", "error": str(e), "content": ""}

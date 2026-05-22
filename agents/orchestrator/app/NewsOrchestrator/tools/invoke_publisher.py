@@ -17,4 +17,4 @@ def invoke_publisher(task_config: dict) -> dict:
     Returns:
         Dict with 'status' ('success'/'error') and either the publish result or error message.
     """
-    return a2a_client.invoke_a2a(PUBLISHER_RUNTIME_ARN, task_config)
+    return a2a_client.invoke_a2a(PUBLISHER_RUNTIME_ARN, task_config, runtime_user_id="orchestrator")
