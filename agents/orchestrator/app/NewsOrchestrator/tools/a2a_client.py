@@ -32,7 +32,7 @@ def get_discovery_client():
 _STREAMING_TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0)
 
 
-def invoke_a2a(runtime_arn: str, task_config: dict) -> dict:
+def invoke_a2a(runtime_arn: str, task_config: dict, *, runtime_user_id: Optional[str] = None) -> dict:
     """Invoke a remote agent via A2A streaming and return the result."""
     endpoint = build_runtime_url(runtime_arn, AWS_REGION)
     session_id = str(uuid4())
@@ -41,11 +41,15 @@ def invoke_a2a(runtime_arn: str, task_config: dict) -> dict:
     credentials = boto_session.get_credentials().get_frozen_credentials()
     auth = SigV4HTTPXAuth(credentials, "bedrock-agentcore", AWS_REGION)
 
+    headers = {"X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id}
+    if runtime_user_id:
+        headers["X-Amzn-Bedrock-AgentCore-Runtime-User-Id"] = runtime_user_id
+
     client_config = ClientConfig(
         httpx_client=httpx.AsyncClient(
             auth=auth,
             timeout=_STREAMING_TIMEOUT,
-            headers={"X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id},
+            headers=headers,
         ),
     )
     agent = A2AAgent(endpoint=endpoint, client_config=client_config)
