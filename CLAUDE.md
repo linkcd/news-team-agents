@@ -178,7 +178,7 @@ pytest tests/
 - **Publisher**: Deployed (A2A). Runtime ID: `newspublisher_NewsPublisher-OZnqGfD4D2`
 - **Orchestrator**: Deployed (A2A). Runtime ID: `newsorchestrator_NewsOrchestrator-255wUd9gwc`
 - **S3 bucket**: `news-agent-data-548129671048` (eu-west-1, 7-day lifecycle)
-- **All agents**: Using A2A protocol with `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))`
+- **All agents**: Using A2A protocol with `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False))`
 
 ## AgentCore Project Layout
 
@@ -191,7 +191,7 @@ agents/<name>/
 │   ├── aws-targets.json        # Deployment targets [{name, account, region}]
 │   └── cdk/                    # CDK stack (TypeScript) — do NOT modify manually
 ├── app/<AgentName>/            # Production code (this gets containerized)
-│   ├── main.py                 # Entrypoint: serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))
+│   ├── main.py                 # Entrypoint: serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False))
 │   ├── agent.py                # Agent factory: system prompt + tools
 │   ├── config.py               # MODEL_ID, constants (env var overridable)
 │   ├── tools/                  # @tool decorated functions
@@ -216,7 +216,7 @@ agents/<name>/
 2. **Write tests** in `tests/` — mock external deps, test tool input/output contracts
 3. **Run tests**: `python3 -m pytest tests/ -v`
 4. **Write agent.py** — system prompt guiding the LLM through the pipeline + register tools
-5. **Write main.py** — `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))` entrypoint
+5. **Write main.py** — `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False))` entrypoint
 6. **Generate lock file**: `cd app/<AgentName> && uv lock`
 7. **Deploy**: `agentcore deploy -y` (builds container via CodeBuild, creates/updates runtime)
 8. **Verify**: `agentcore invoke '{"task": {...}}' --stream`

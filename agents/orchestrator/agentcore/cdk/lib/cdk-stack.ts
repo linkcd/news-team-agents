@@ -134,7 +134,10 @@ def handler(event, context):
 `),
     });
 
-    orchestratorRuntime.grantInvoke(invokerFn);
+    invokerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['bedrock-agentcore:InvokeAgentRuntime'],
+      resources: [orchestratorArn, `${orchestratorArn}/*`],
+    }));
 
     new events.Rule(this, 'ScheduleRule', {
       ruleName: 'news-agent-6h-schedule',

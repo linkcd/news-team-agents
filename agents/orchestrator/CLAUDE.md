@@ -12,7 +12,7 @@ This agent is NOT general-purpose — it encodes the specific business logic for
 
 - **Runtime ID**: `newsorchestrator_NewsOrchestrator-255wUd9gwc`
 - **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newsorchestrator_NewsOrchestrator-255wUd9gwc`
-- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))`
+- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False))`
 - **Region**: eu-west-1
 
 ## Interface
