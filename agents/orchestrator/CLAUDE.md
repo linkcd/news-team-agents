@@ -12,7 +12,7 @@ This agent is NOT general-purpose — it encodes the specific business logic for
 
 - **Runtime ID**: `<RUNTIME_ID>`
 - **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>`
-- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True))`
+- **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False))`
 - **Region**: eu-west-1
 
 ## Interface
