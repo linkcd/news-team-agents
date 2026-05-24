@@ -109,7 +109,7 @@ Failure (after retry):
    - If post exists: type = "merge_update"
    - source: S3 data_key from Collector result
    - template: "norway_daily"
-   - merge_strategy: append new, replace+changelog for updates, renumber, regenerate summary
+   - merge_strategy: prepend new (newest first), replace+changelog for updates, renumber, regenerate summary
    - editorial: 300-word day summary
 
 6. Invoke Publisher:

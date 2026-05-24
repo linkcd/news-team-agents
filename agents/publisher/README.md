@@ -7,11 +7,10 @@ General-purpose editorial and publishing agent built on AWS Bedrock AgentCore. F
 ```
 AgentCore Runtime (Container, Python 3.12, eu-west-1)
   ├── Tools
-  │   ├── read_from_s3        — Read collected content from S3
-  │   ├── read_repo_file      — Read files from public GitHub repos
-  │   ├── format_post         — Render Jinja2 templates to markdown
-  │   ├── merge_posts         — Deterministic merge into existing posts
+  │   ├── read_from_s3        — Read collected content from S3 (for publish_new)
   │   ├── git_clone           — Clone repo (auth via AgentCore Identity)
+  │   ├── read_local_file     — Read file from cloned repo
+  │   ├── merge_posts         — Deterministic merge (reads S3 directly, inserts/renumbers)
   │   └── git_commit_and_push — Write, commit, push to origin
   └── Templates
       ├── norway_daily.md.j2  — Norwegian daily news post
@@ -162,7 +161,7 @@ agentcore invoke '{
       "file_path": "source/_posts/20260521-norway.md"
     },
     "merge_strategy": {
-      "new_items": "append_per_section",
+      "new_items": "prepend_per_section",
       "updated_items": "replace_summary_and_add_source",
       "renumber": true,
       "regenerate_day_summary": true

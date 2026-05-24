@@ -3,6 +3,7 @@ import re
 
 import boto3
 import httpx
+from bedrock_agentcore.identity import requires_api_key
 from strands import tool
 
 
@@ -58,6 +59,16 @@ def _parse_s3_collection(data: dict) -> tuple[list[str], list[dict]]:
     return urls, topics
 
 
+@requires_api_key(provider_name="github-token", into="api_key")
+def _fetch_github_file(repo: str, path: str, api_key: str = "") -> dict:
+    """Fetch a file from GitHub using the injected token for private repos."""
+    raw_url = f"https://raw.githubusercontent.com/{repo}/main/{path}"
+    headers = {"Authorization": f"token {api_key}"} if api_key else {}
+    response = httpx.get(raw_url, timeout=15, follow_redirects=True, headers=headers)
+    response.raise_for_status()
+    return {"content": response.text}
+
+
 @tool
 def get_dedup_context(dedup_config: str) -> dict:
     """Read existing URLs and topic summaries from a dedup source.
@@ -87,14 +98,16 @@ def get_dedup_context(dedup_config: str) -> dict:
     if source_type == "github_file":
         repo = config["repo"]
         path = config["path"]
-        raw_url = f"https://raw.githubusercontent.com/{repo}/main/{path}"
         try:
-            response = httpx.get(raw_url, timeout=15, follow_redirects=True)
-            response.raise_for_status()
+            result = _fetch_github_file(repo=repo, path=path)
+            content = result["content"]
         except Exception:
             return {"status": "success", "known_urls": [], "existing_topics": []}
 
-        urls, topics = _parse_markdown_topics(response.text)
+        if not content:
+            return {"status": "success", "known_urls": [], "existing_topics": []}
+
+        urls, topics = _parse_markdown_topics(content)
         return {"status": "success", "known_urls": urls, "existing_topics": topics}
 
     if source_type == "s3_file":

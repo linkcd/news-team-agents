@@ -69,7 +69,7 @@ Merge new content and topic updates into an existing post.
       "file_path": "source/_posts/20260521-norway.md"
     },
     "merge_strategy": {
-      "new_items": "append_per_section",
+      "new_items": "prepend_per_section",
       "updated_items": "replace_summary_and_add_source",
       "renumber": true,
       "regenerate_day_summary": true
@@ -176,6 +176,8 @@ categories: [每日新闻, 挪威]
 ## 今日综述
 [300-word summary connecting themes across all topics]
 
+*最后更新: 17:00 UTC*
+
 <!-- more -->
 
 ## 国内新闻
@@ -207,19 +209,20 @@ categories: [每日新闻, 挪威]
 
 ---
 *新闻来源: NRK, VG, TV2, Dagbladet, Aftenposten, Dagsavisen, E24*
-*最后更新: 17:00 UTC*
 ```
 
 ## Tools
 
 | Tool | Purpose |
 |------|---------|
-| `read_from_s3(bucket, key)` | Read collected items JSON from S3 |
-| `read_repo_file(repo, branch, path)` | Read existing file from public GitHub repo (for merge_update) |
+| `read_from_s3(bucket, key)` | Read collected items JSON from S3 (used by publish_new) |
 | `git_clone(repo, branch)` | Clone repo locally (authenticated via AgentCore Identity) |
+| `read_local_file(repo_path, file_path)` | Read file from cloned repo (avoids private repo auth issues) |
+| `merge_posts(existing_content, s3_bucket, s3_key, strategy)` | Deterministic structural merge — reads new items from S3, inserts into correct sections, renumbers. LLM only rewrites the day summary. |
 | `git_commit_and_push(repo_path, file_path, content, commit_message)` | Write file, commit, and push |
 
-The LLM writes markdown directly from the template format embedded in its system prompt — no Jinja2 rendering or deterministic merge tools. This avoids the LLM re-serializing large data through tool arguments.
+For `publish_new`: the LLM writes markdown directly from the template format in its system prompt.
+For `merge_update`: the `merge_posts` tool handles the structural merge deterministically (preserving all existing items, inserting new items at top of each section, renumbering). The LLM only rewrites the ~300-word day summary. This pattern follows Anthropic's recommendation to never ask an LLM to reproduce existing content verbatim — deterministic code preserves existing content while the LLM handles only the creative work.
 
 ## Authentication
 
@@ -238,19 +241,21 @@ Git operations use AgentCore Identity (`@requires_api_key(provider_name="github-
 - bedrock-agentcore[a2a] (A2A runtime serving + Identity for GitHub token)
 - gitpython (git operations)
 - boto3 (S3 reads)
-- httpx (reading files from public repos)
+- httpx (HTTP client)
 
 ## Development
 
 ```bash
 agentcore dev                    # local development
-python3 -m pytest tests/ -v      # run unit tests (20 tests)
+python3 -m pytest tests/ -v      # run unit tests (23 tests)
 agentcore deploy -y              # deploy to AWS
 agentcore invoke '{"task": {...}}' --stream  # invoke
 ```
 
 ## Design Principles
 
-- **LLM writes markdown directly**: No intermediate Jinja2 rendering or tool-based formatting. The LLM reads structured JSON from S3 and produces the final markdown in one pass.
-- **Minimal data through tool arguments**: Tools read/write data; the LLM holds the content in context and produces output directly to `git_commit_and_push`.
+- **Deterministic merge, creative summary**: For `merge_update`, the `merge_posts` tool handles structural merge (insert, renumber, preserve existing items) while the LLM only writes the ~300-word day summary. This follows Anthropic's best practice: never ask the LLM to reproduce existing content verbatim.
+- **LLM writes markdown directly for new posts**: For `publish_new`, the LLM reads structured JSON from S3 and produces the full markdown in one pass.
+- **Tools read data from source**: The `merge_posts` tool reads S3 directly (avoiding large JSON serialization through LLM tool arguments which can corrupt data).
+- **Git clone for private repo access**: Uses `git_clone` + `read_local_file` instead of raw.githubusercontent.com (which fails for private repos).
 - **Git as deployment trigger**: Publisher pushes to Git. Deployment (hexo, Jekyll, etc.) is handled by CI/CD in the target repo.

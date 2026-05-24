@@ -2,6 +2,7 @@ import json
 import re
 import datetime
 
+import boto3
 from strands import tool
 
 from tools.sections import SECTION_MAP, SECTION_ORDER, REVERSE_SECTION_MAP
@@ -115,6 +116,8 @@ def _rebuild_post(parsed: dict, updated_time: str) -> str:
     parts.append("## 今日综述")
     parts.append(parsed["summary"])
     parts.append("")
+    parts.append(f"*最后更新: {updated_time} UTC*")
+    parts.append("")
     parts.append("<!-- more -->")
     parts.append("")
 
@@ -135,34 +138,37 @@ def _rebuild_post(parsed: dict, updated_time: str) -> str:
             for s in item["source_urls"]:
                 all_sources.add(s["source_label"])
     parts.append(f"*新闻来源: {', '.join(sorted(all_sources))}*")
-    parts.append(f"*最后更新: {updated_time} UTC*")
 
     return "\n".join(parts)
 
 
 @tool
-def merge_posts(existing_content: str, new_items: str, updated_items: str, strategy: str) -> str:
+def merge_posts(existing_content: str, s3_bucket: str, s3_key: str, strategy: str) -> str:
     """Merge new and updated items into an existing blog post.
 
-    Deterministic merge: parses existing markdown, inserts new items at correct positions,
-    updates existing items with new summaries/sources, and renumbers.
+    Deterministic merge: reads new items from S3, parses existing markdown,
+    inserts new items at correct positions, updates existing items, and renumbers.
 
     Args:
         existing_content: The full markdown content of the existing blog post
-        new_items: JSON string of new items to append (same format as Collector output new_items)
-        updated_items: JSON string of items to update (same format as Collector output updated_items)
+        s3_bucket: S3 bucket containing the collected items JSON
+        s3_key: S3 key of the collected items JSON
         strategy: JSON string with merge strategy options (new_items, updated_items, renumber, regenerate_day_summary)
 
     Returns:
-        Dict with status, merged content, and counts (new_items_added, existing_items_updated, total_items)
+        JSON string with status, merged content, and counts (new_items_added, existing_items_updated, total_items)
     """
     if not existing_content.strip():
         return json.dumps({"status": "error", "error": "Cannot merge into empty existing content. Use format_post for new posts."})
 
     try:
+        s3 = boto3.client("s3")
+        obj = s3.get_object(Bucket=s3_bucket, Key=s3_key)
+        collection_data = json.loads(obj["Body"].read())
+
         parsed = _parse_post(existing_content)
-        new = json.loads(new_items)
-        updated = json.loads(updated_items)
+        new = collection_data.get("new_items", [])
+        updated = collection_data.get("updated_items", [])
         strat = json.loads(strategy)
 
         items_added = 0
@@ -191,7 +197,8 @@ def merge_posts(existing_content: str, new_items: str, updated_items: str, strat
                 if matched:
                     break
 
-        # Append new items to correct sections
+        # Insert new items into correct sections
+        prepend = strat.get("new_items") == "prepend_per_section"
         for item in new:
             cat = item.get("category", "domestic")
             if cat not in parsed["sections"]:
@@ -204,14 +211,19 @@ def merge_posts(existing_content: str, new_items: str, updated_items: str, strat
                 {"source_label": s["source_label"], "url": s["url"]} for s in sources
             ]
 
-            parsed["sections"][cat].append({
+            new_entry = {
                 "title_zh": item["title_zh"],
                 "sources_text": sources_text,
                 "earliest_time": earliest,
                 "summary_zh": item["summary_zh"],
                 "source_urls": source_urls,
                 "changelog": "",
-            })
+            }
+
+            if prepend:
+                parsed["sections"][cat].insert(0, new_entry)
+            else:
+                parsed["sections"][cat].append(new_entry)
             items_added += 1
 
         # Count total items

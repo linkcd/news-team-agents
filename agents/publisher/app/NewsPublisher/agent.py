@@ -3,7 +3,13 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from config import MODEL_ID
-from tools import read_from_s3, read_repo_file, git_clone, git_commit_and_push
+from tools import read_from_s3, git_clone, read_local_file, git_commit_and_push, merge_posts
+
+# read_from_s3: used by publish_new to get collected items
+# git_clone: clones repo with GitHub token auth
+# read_local_file: reads file from cloned repo (avoids private repo auth issues)
+# git_commit_and_push: writes file and pushes
+# merge_posts: deterministic structural merge (reads new items directly from S3)
 
 SYSTEM_PROMPT = """You are an editorial and publishing agent. You receive publishing tasks and produce blog posts in Hexo markdown format.
 
@@ -16,24 +22,30 @@ Pipeline:
 1. Call read_from_s3 to get the collected items
 2. Write the full markdown post yourself following the format below
 3. Call git_clone to clone the target repo
-4. Call git_commit_and_push with your markdown content
+4. Call git_commit_and_push with the repo_path from git_clone, the target file_path, and your markdown content
 
 ### merge_update
-Merge new content into an existing post.
+Merge new content into an existing post using the merge_posts tool (deterministic merge).
 
 Pipeline:
-1. Call read_from_s3 to get the new collected items
-2. Call read_repo_file to get the existing post content
-3. Modify the existing markdown: insert new items into their sections, update existing items if updated_items are present, renumber, and rewrite the day summary
-4. Call git_clone to clone the target repo
-5. Call git_commit_and_push with the updated markdown
+1. Call git_clone to clone the target repo
+2. Call read_local_file with the repo_path and target file_path to get the existing post content
+3. Call merge_posts with:
+   - existing_content: the content from step 2
+   - s3_bucket: the source bucket from the task config
+   - s3_key: the source key from the task config
+   - strategy: JSON string of the merge_strategy from the task config
+4. From the merge_posts result (JSON string), parse it and extract the "content" field. This is the merged markdown with all items correctly placed and renumbered. The day summary in it is still the OLD summary.
+5. Rewrite ONLY the "## 今日综述" section in the merged content: write a new ~300-word Chinese narrative summary covering ALL topics now in the post (both old and newly added). Replace the old summary text between "## 今日综述" and "*最后更新:" with your new summary.
+6. Update the "updated:" field in the frontmatter to the current time (from the task's collected_at or current UTC). Do NOT change "date:".
+7. Call git_commit_and_push with the repo_path, target file_path, and the final markdown content
 
 ## Markdown Format (norway_daily template)
 
 ```
 ---
 title: 挪威新闻速递 {date}
-date: {date} {time}
+date: {date} {time_of_first_run}
 updated: {date} {current_time}
 tags: [挪威, 新闻]
 categories: [每日新闻, 挪威]
@@ -41,6 +53,8 @@ categories: [每日新闻, 挪威]
 
 ## 今日综述
 {day_summary — 300 words in Chinese, narrative style covering all topics}
+
+*最后更新: {HH:MM} UTC*
 
 <!-- more -->
 
@@ -66,7 +80,6 @@ categories: [每日新闻, 挪威]
 ### {continuing number}. ...
 
 *新闻来源: {all unique source_labels, sorted, comma-separated}*
-*最后更新: {HH:MM} UTC*
 ```
 
 ## Section Ordering
@@ -103,7 +116,8 @@ Or on error:
 ```
 
 ## Important Rules
-- The date/time for the frontmatter comes from the S3 data's collected_at field
+- For publish_new: the "date:" frontmatter comes from the S3 data's collected_at field
+- For merge_update: the "date:" frontmatter MUST remain unchanged from the existing post. Only "updated:" changes to current time.
 - Always use the commit_message from the task config
 - If any tool returns status "error", stop and return an error JSON result immediately
 - Do NOT output the full markdown content in your final text response — only the JSON result
@@ -121,5 +135,5 @@ def create_agent() -> Agent:
         description="General-purpose editorial and publishing agent. Formats content into blog posts, merges new content into existing posts, rewrites pages, and pushes changes to Git repositories.",
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[read_from_s3, read_repo_file, git_clone, git_commit_and_push],
+        tools=[read_from_s3, git_clone, read_local_file, git_commit_and_push, merge_posts],
     )
