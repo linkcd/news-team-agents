@@ -34,6 +34,7 @@ date: 2026-05-21 05:00:00
         "https://raw.githubusercontent.com/claw-lu/hexo-blog/main/source/_posts/20260521-norway.md",
         timeout=15,
         follow_redirects=True,
+        headers={},
     )
 
 

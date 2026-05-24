@@ -212,7 +212,7 @@ The agent supports multiple dedup source types:
 
 | Type | Description | What It Provides | Auth |
 |------|-------------|-----------------|------|
-| `github_file` | Read a markdown file from a public GitHub repo | known_urls + existing topics (parsed from post structure) | None (public repos) |
+| `github_file` | Read a markdown file from a GitHub repo | known_urls + existing topics (parsed from post structure) | AgentCore Identity (`github-token`) |
 | `s3_file` | Read a previous collection output from S3 | known_urls + existing topics | IAM role |
 | `url_list` | Explicit list of URLs to skip | known_urls only (no topic matching) | None |
 | `none` | No dedup, no topic matching | Empty | None |

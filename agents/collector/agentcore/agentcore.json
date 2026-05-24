@@ -19,7 +19,12 @@
     }
   ],
   "memories": [],
-  "credentials": [],
+  "credentials": [
+    {
+      "authorizerType": "ApiKeyCredentialProvider",
+      "name": "github-token"
+    }
+  ],
   "evaluators": [],
   "onlineEvalConfigs": [],
   "agentCoreGateways": [],

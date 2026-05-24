@@ -33,6 +33,24 @@ def git_clone(repo: str, branch: str) -> dict:
 
 
 @tool
+def read_local_file(repo_path: str, file_path: str) -> str:
+    """Read a file from a locally cloned repository.
+
+    Args:
+        repo_path: Local path to the cloned repository (from git_clone result)
+        file_path: Path within the repo to read (e.g. "source/_posts/20260521-norway.md")
+
+    Returns:
+        The file content as a string, or empty string if the file does not exist.
+    """
+    full_path = os.path.join(repo_path, file_path)
+    if not os.path.exists(full_path):
+        return ""
+    with open(full_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@tool
 def git_commit_and_push(repo_path: str, file_path: str, content: str, commit_message: str) -> dict:
     """Write content to a file in the repo, commit, and push.
 

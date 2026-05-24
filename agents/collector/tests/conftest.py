@@ -15,6 +15,19 @@ if "boto3" not in sys.modules:
     boto3_mock = MagicMock()
     sys.modules["boto3"] = boto3_mock
 
+# Stub out bedrock_agentcore for testing
+def _passthrough_decorator(**kwargs):
+    def decorator(func):
+        return func
+    return decorator
+
+bedrock_agentcore_mock = MagicMock()
+bedrock_agentcore_identity_mock = MagicMock()
+bedrock_agentcore_identity_mock.requires_api_key = _passthrough_decorator
+sys.modules["bedrock_agentcore"] = bedrock_agentcore_mock
+sys.modules["bedrock_agentcore.identity"] = bedrock_agentcore_identity_mock
+sys.modules["bedrock_agentcore.runtime"] = MagicMock()
+
 import pytest
 
 

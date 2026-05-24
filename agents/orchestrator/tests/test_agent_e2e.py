@@ -150,7 +150,7 @@ class TestOrchestratorWorkflow:
             "type": "merge_update",
             "source": {"type": "s3", "bucket": "news-agent-data-548129671048", "key": coll_result["data_key"]},
             "target": {"repo": "claw-lu/hexo-blog", "branch": "main", "file_path": "source/_posts/20260521-norway.md"},
-            "merge_strategy": {"new_items": "append_per_section", "updated_items": "replace_summary_and_add_source", "renumber": True, "regenerate_day_summary": True},
+            "merge_strategy": {"new_items": "prepend_per_section", "updated_items": "replace_summary_and_add_source", "renumber": True, "regenerate_day_summary": True},
         })
         assert pub_result["status"] == "success"
         assert pub_result["result"]["action"] == "merge_update"

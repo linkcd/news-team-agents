@@ -70,7 +70,7 @@ news-agent/
 - **Each agent subfolder is standalone**: Own `src/` for code, `infra/` for CDK, `tests/` for evaluation. Each can be developed, deployed, and evaluated independently.
 - **Cross-cutting infra lives in orchestrator's CDK stack**: EventBridge rule, invoker Lambda, IAM permissions for downstream agents.
 - **Data flows through S3, not LLM context**: Bulk content never passes through the Orchestrator's context window.
-- **Deterministic tools for structural work**: Multi-run merge, dedup, renumbering are Python code. LLM only does creative work (translation, summarization, topic consolidation).
+- **Deterministic tools for structural work**: Multi-run merge (`merge_posts` tool), dedup, renumbering are Python code. LLM only does creative work (translation, summarization, topic consolidation, day summary). Following Anthropic's guidance: never ask an LLM to reproduce existing content verbatim.
 - **Topic-based content model**: Multiple articles about the same event → one consolidated topic. Reduces noise, produces richer summaries with multiple sources.
 
 ## Key Requirements

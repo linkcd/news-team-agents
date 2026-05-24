@@ -68,7 +68,7 @@ If type is "publish_new":
 
 If type is "merge_update":
 - target: {"repo": "claw-lu/hexo-blog", "branch": "main", "file_path": "{post_path}"}
-- merge_strategy: {"new_items": "append_per_section", "updated_items": "replace_summary_and_add_source", "renumber": true, "regenerate_day_summary": true}
+- merge_strategy: {"new_items": "prepend_per_section", "updated_items": "replace_summary_and_add_source", "renumber": true, "regenerate_day_summary": true}
 - editorial: {"generate_summary": true, "summary_word_count": 300, "summary_scope": "all_items"}
 
 ### Step 6: Invoke Publisher
