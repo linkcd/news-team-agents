@@ -7,12 +7,14 @@ import {
 import {
   CfnOutput,
   Duration,
+  RemovalPolicy,
   Stack,
   type StackProps,
   aws_events as events,
   aws_events_targets as targets,
   aws_iam as iam,
   aws_lambda as lambda,
+  aws_logs as logs,
 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 
@@ -78,6 +80,49 @@ export class AgentCoreStack extends Stack {
           'arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2/*',
         ],
       }));
+
+      // --- Observability: Tracing + Log Delivery ---
+      const runtimeArn = orchestratorEnv.runtime.runtimeArn;
+
+      // Tracing delivery to X-Ray
+      const tracesSource = new logs.CfnDeliverySource(this, 'TracesSource', {
+        name: 'newsorchestrator-traces-source',
+        resourceArn: runtimeArn,
+        logType: 'TRACES',
+      });
+
+      const tracesDestination = new logs.CfnDeliveryDestination(this, 'TracesDestination', {
+        name: 'newsorchestrator-traces-destination',
+        deliveryDestinationType: 'XRAY',
+      });
+
+      new logs.CfnDelivery(this, 'TracesDelivery', {
+        deliverySourceName: tracesSource.name,
+        deliveryDestinationArn: tracesDestination.attrArn,
+      });
+
+      // Application log delivery to CloudWatch
+      const logGroup = new logs.LogGroup(this, 'AppLogsGroup', {
+        logGroupName: `/aws/vendedlogs/bedrock-agentcore/runtime/APPLICATION_LOGS/${orchestratorEnv.runtime.runtimeId}`,
+        retention: logs.RetentionDays.TWO_WEEKS,
+        removalPolicy: RemovalPolicy.RETAIN,
+      });
+
+      const logsSource = new logs.CfnDeliverySource(this, 'LogsSource', {
+        name: 'newsorchestrator-logs-source',
+        resourceArn: runtimeArn,
+        logType: 'APPLICATION_LOGS',
+      });
+
+      const logsDestination = new logs.CfnDeliveryDestination(this, 'LogsDestination', {
+        name: 'newsorchestrator-logs-destination',
+        destinationResourceArn: logGroup.logGroupArn,
+      });
+
+      new logs.CfnDelivery(this, 'LogsDelivery', {
+        deliverySourceName: logsSource.name,
+        deliveryDestinationArn: logsDestination.attrArn,
+      });
     }
 
     // EventBridge schedule: invoke orchestrator every 6 hours

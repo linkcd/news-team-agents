@@ -180,6 +180,18 @@ pytest tests/
 - **S3 bucket**: `news-agent-data-548129671048` (eu-west-1, 7-day lifecycle)
 - **All agents**: Using A2A protocol with `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False))`
 
+## Observability
+
+Each agent's CDK stack provisions tracing and log delivery via CloudWatch Logs delivery pipeline:
+
+- **Tracing**: X-Ray delivery via `CfnDeliverySource` (logType=TRACES) → `CfnDeliveryDestination` (type=XRAY) → `CfnDelivery`
+- **Log delivery**: Application logs via `CfnDeliverySource` (logType=APPLICATION_LOGS) → CloudWatch LogGroup → `CfnDelivery`
+- **Retention**: Vended log groups at `/aws/vendedlogs/bedrock-agentcore/runtime/APPLICATION_LOGS/{runtimeId}` with 14-day retention
+- **Console**: Traces viewable at CloudWatch > Gen-AI Observability > Agent Core
+- **CLI**: `agentcore traces list`, `agentcore logs --since 1h`
+
+Note: The service also creates runtime log groups at `/aws/bedrock-agentcore/runtimes/{runtimeId}-DEFAULT` (health checks, OTel metrics). The vended log delivery groups are separate and contain structured application telemetry.
+
 ## AgentCore Project Layout
 
 Each agent follows the agentcore CLI project convention:

@@ -113,10 +113,12 @@ def _render_item(number: int, item: dict) -> str:
 def _rebuild_post(parsed: dict, updated_time: str) -> str:
     """Rebuild the full post markdown from parsed structure."""
     parts = [parsed["frontmatter"], ""]
-    parts.append("## 今日综述")
-    parts.append(parsed["summary"])
+    parts.append("<style>article.article-content, .post-body, .article-entry { font-size: 1.15em; line-height: 1.8; }</style>")
     parts.append("")
     parts.append(f"*最后更新: {updated_time} UTC*")
+    parts.append("")
+    parts.append("## 今日综述")
+    parts.append(parsed["summary"])
     parts.append("")
     parts.append("<!-- more -->")
     parts.append("")

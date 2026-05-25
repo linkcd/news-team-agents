@@ -128,7 +128,7 @@ Or on error:
 def create_agent() -> Agent:
     model = BedrockModel(
         model_id=MODEL_ID,
-        boto_client_config=BotoConfig(read_timeout=300, connect_timeout=10),
+        boto_client_config=BotoConfig(read_timeout=600, connect_timeout=10),
     )
     return Agent(
         name="NewsPublisher",
