@@ -173,10 +173,12 @@ tags: [挪威, 新闻]
 categories: [每日新闻, 挪威]
 ---
 
-## 今日综述
-[300-word summary connecting themes across all topics]
+<style>article.article-content, .post-body, .article-entry { font-size: 1.15em; line-height: 1.8; }</style>
 
 *最后更新: 17:00 UTC*
+
+## 今日综述
+[300-word summary connecting themes across all topics]
 
 <!-- more -->
 
