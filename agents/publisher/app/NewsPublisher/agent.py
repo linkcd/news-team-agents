@@ -36,7 +36,7 @@ Pipeline:
    - s3_key: the source key from the task config
    - strategy: JSON string of the merge_strategy from the task config
 4. From the merge_posts result (JSON string), parse it and extract the "content" field. This is the merged markdown with all items correctly placed and renumbered. The day summary in it is still the OLD summary.
-5. Rewrite ONLY the "## 今日综述" section in the merged content: write a new ~300-word Chinese narrative summary covering ALL topics now in the post (both old and newly added). Replace the old summary text between "## 今日综述" and "*最后更新:" with your new summary.
+5. Rewrite ONLY the "## 今日综述" section in the merged content: write a new ~300-word Chinese narrative summary covering ALL topics now in the post (both old and newly added). Replace the old summary text between "## 今日综述" and "<!-- more -->" with your new summary. IMPORTANT: preserve the <style> tag and "*最后更新:" line that appear BEFORE "## 今日综述" — do NOT remove them.
 6. Update the "updated:" field in the frontmatter to the current time (from the task's collected_at or current UTC). Do NOT change "date:".
 7. Call git_commit_and_push with the repo_path, target file_path, and the final markdown content
 
@@ -51,10 +51,12 @@ tags: [挪威, 新闻]
 categories: [每日新闻, 挪威]
 ---
 
-## 今日综述
-{day_summary — 300 words in Chinese, narrative style covering all topics}
+<style>article.article-content, .post-body, .article-entry { font-size: 1.15em; line-height: 1.8; }</style>
 
 *最后更新: {HH:MM} UTC*
+
+## 今日综述
+{day_summary — 300 words in Chinese, narrative style covering all topics}
 
 <!-- more -->
 
