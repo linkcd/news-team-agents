@@ -145,21 +145,31 @@ def _rebuild_post(parsed: dict, updated_time: str) -> str:
 
 
 @tool
-def merge_posts(existing_content: str, s3_bucket: str, s3_key: str, strategy: str) -> str:
-    """Merge new and updated items into an existing blog post.
+def merge_posts(repo_path: str, file_path: str, s3_bucket: str, s3_key: str, strategy: str) -> str:
+    """Merge new and updated items into an existing blog post on disk.
 
-    Deterministic merge: reads new items from S3, parses existing markdown,
-    inserts new items at correct positions, updates existing items, and renumbers.
+    Reads existing content from repo_path/file_path, merges with new items from S3,
+    and writes the result back to the same file. Returns only metadata (not content).
 
     Args:
-        existing_content: The full markdown content of the existing blog post
+        repo_path: Local path to the cloned repository (from git_clone result)
+        file_path: Path within the repo to the existing blog post
         s3_bucket: S3 bucket containing the collected items JSON
         s3_key: S3 key of the collected items JSON
         strategy: JSON string with merge strategy options (new_items, updated_items, renumber, regenerate_day_summary)
 
     Returns:
-        JSON string with status, merged content, and counts (new_items_added, existing_items_updated, total_items)
+        JSON string with status and counts (new_items_added, existing_items_updated, total_items)
     """
+    import os
+    full_path = os.path.join(repo_path, file_path)
+
+    if not os.path.exists(full_path):
+        return json.dumps({"status": "error", "error": f"File not found: {file_path}"})
+
+    with open(full_path, "r", encoding="utf-8") as f:
+        existing_content = f.read()
+
     if not existing_content.strip():
         return json.dumps({"status": "error", "error": "Cannot merge into empty existing content. Use format_post for new posts."})
 
@@ -208,7 +218,7 @@ def merge_posts(existing_content: str, s3_bucket: str, s3_key: str, strategy: st
 
             sources = item.get("sources", [])
             sources_text = ", ".join(s["source_label"] for s in sources)
-            earliest = min((s["published_at"] for s in sources), default="")
+            earliest = min((s["published_at"] for s in sources if s.get("published_at")), default="")
             source_urls = [
                 {"source_label": s["source_label"], "url": s["url"]} for s in sources
             ]
@@ -234,9 +244,11 @@ def merge_posts(existing_content: str, s3_bucket: str, s3_key: str, strategy: st
         updated_time = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M")
         content = _rebuild_post(parsed, updated_time)
 
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
         return json.dumps({
             "status": "success",
-            "content": content,
             "new_items_added": items_added,
             "existing_items_updated": items_updated,
             "total_items": total,

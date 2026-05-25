@@ -54,9 +54,15 @@ def test_publish_new_tool_sequence(sample_collection_data):
 
     assert clone_result["status"] == "success"
 
-    # Step 3: Git commit and push (LLM would generate markdown between steps 1 and 3)
+    # Step 3: Git commit and push (file already written to disk by prior tools)
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = "source/_posts/20260521-norway.md"
+        full_path = os.path.join(tmpdir, file_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w") as f:
+            f.write("---\ntitle: test\n---\n## content")
+
         with patch("tools.git_ops.git.Repo") as MockRepo:
             mock_repo = MagicMock()
             MockRepo.return_value = mock_repo
@@ -67,8 +73,7 @@ def test_publish_new_tool_sequence(sample_collection_data):
 
             push_result = git_commit_and_push(
                 repo_path=tmpdir,
-                file_path="source/_posts/20260521-norway.md",
-                content="---\ntitle: test\n---\n## content",
+                file_path=file_path,
                 commit_message="Add Norway news 2026-05-21",
             )
 

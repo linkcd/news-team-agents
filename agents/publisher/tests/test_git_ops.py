@@ -47,24 +47,31 @@ def test_clone_with_token_uses_token_in_url():
     assert "claw-lu/hexo-blog" in clone_url
 
 
-def test_git_commit_and_push_writes_and_pushes():
+def test_git_commit_and_push_commits_and_pushes():
     from tools.git_ops import git_commit_and_push
 
-    with patch("tools.git_ops.git.Repo") as MockRepo:
-        mock_repo = MagicMock()
-        MockRepo.return_value = mock_repo
-        mock_repo.index = MagicMock()
-        mock_commit = MagicMock()
-        mock_commit.hexsha = "abc123def456"
-        mock_repo.index.commit.return_value = mock_commit
-        mock_repo.remote.return_value = MagicMock()
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = "source/_posts/20260521-norway.md"
+        full_path = os.path.join(tmpdir, file_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w") as f:
+            f.write("# Test content")
 
-        result = git_commit_and_push(
-            repo_path="/tmp/hexo-blog",
-            file_path="source/_posts/20260521-norway.md",
-            content="# Test content",
-            commit_message="Add Norway news 2026-05-21",
-        )
+        with patch("tools.git_ops.git.Repo") as MockRepo:
+            mock_repo = MagicMock()
+            MockRepo.return_value = mock_repo
+            mock_repo.index = MagicMock()
+            mock_commit = MagicMock()
+            mock_commit.hexsha = "abc123def456"
+            mock_repo.index.commit.return_value = mock_commit
+            mock_repo.remote.return_value = MagicMock()
+
+            result = git_commit_and_push(
+                repo_path=tmpdir,
+                file_path=file_path,
+                commit_message="Add Norway news 2026-05-21",
+            )
 
     assert result["status"] == "success"
     assert result["commit_sha"] == "abc123def456"
@@ -72,11 +79,18 @@ def test_git_commit_and_push_writes_and_pushes():
     mock_repo.index.commit.assert_called_once_with("Add Norway news 2026-05-21")
 
 
-def test_git_commit_and_push_writes_file_content():
+def test_git_commit_and_push_does_not_modify_file():
+    """git_commit_and_push should only commit; it should not write or overwrite the file."""
     from tools.git_ops import git_commit_and_push
 
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = "source/_posts/test.md"
+        full_path = os.path.join(tmpdir, file_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w") as f:
+            f.write("# Hello")
+
         with patch("tools.git_ops.git.Repo") as MockRepo:
             mock_repo = MagicMock()
             MockRepo.return_value = mock_repo
@@ -85,15 +99,12 @@ def test_git_commit_and_push_writes_file_content():
             mock_repo.index.commit.return_value = mock_commit
             mock_repo.remote.return_value = MagicMock()
 
-            file_path = "source/_posts/test.md"
             result = git_commit_and_push(
                 repo_path=tmpdir,
                 file_path=file_path,
-                content="# Hello",
                 commit_message="test",
             )
 
-        full_path = os.path.join(tmpdir, file_path)
-        assert os.path.exists(full_path)
+        assert result["status"] == "success"
         with open(full_path) as f:
             assert f.read() == "# Hello"

@@ -3,13 +3,14 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from config import MODEL_ID
-from tools import read_from_s3, git_clone, read_local_file, git_commit_and_push, merge_posts
+from tools import read_from_s3, git_clone, read_local_file, write_new_post, git_commit_and_push, merge_posts, update_summary
 
 # read_from_s3: used by publish_new to get collected items
 # git_clone: clones repo with GitHub token auth
 # read_local_file: reads file from cloned repo (avoids private repo auth issues)
-# git_commit_and_push: writes file and pushes
-# merge_posts: deterministic structural merge (reads new items directly from S3)
+# git_commit_and_push: commits file already on disk and pushes
+# merge_posts: deterministic structural merge (reads from disk + S3, writes to disk)
+# update_summary: replaces day summary section in file on disk
 
 SYSTEM_PROMPT = """You are an editorial and publishing agent. You receive publishing tasks and produce blog posts in Hexo markdown format.
 
@@ -20,25 +21,29 @@ Create a new blog post from collected content.
 
 Pipeline:
 1. Call read_from_s3 to get the collected items
-2. Write the full markdown post yourself following the format below
-3. Call git_clone to clone the target repo
-4. Call git_commit_and_push with the repo_path from git_clone, the target file_path, and your markdown content
+2. Call git_clone to clone the target repo
+3. Write the full markdown post yourself following the format below, then call write_new_post with repo_path, file_path, and your markdown content to save it to disk
+4. Call git_commit_and_push with repo_path, file_path, and commit_message
 
 ### merge_update
-Merge new content into an existing post using the merge_posts tool (deterministic merge).
+Merge new content into an existing post using file-based tools (no large content in arguments).
 
 Pipeline:
 1. Call git_clone to clone the target repo
-2. Call read_local_file with the repo_path and target file_path to get the existing post content
-3. Call merge_posts with:
-   - existing_content: the content from step 2
+2. Call merge_posts with:
+   - repo_path: from git_clone result
+   - file_path: the target file_path from the task config
    - s3_bucket: the source bucket from the task config
    - s3_key: the source key from the task config
    - strategy: JSON string of the merge_strategy from the task config
-4. From the merge_posts result (JSON string), parse it and extract the "content" field. This is the merged markdown with all items correctly placed and renumbered. The day summary in it is still the OLD summary.
-5. Rewrite ONLY the "## 今日综述" section in the merged content: write a new ~300-word Chinese narrative summary covering ALL topics now in the post (both old and newly added). Replace the old summary text between "## 今日综述" and "<!-- more -->" with your new summary. IMPORTANT: preserve the <style> tag and "*最后更新:" line that appear BEFORE "## 今日综述" — do NOT remove them.
-6. Update the "updated:" field in the frontmatter to the current time (from the task's collected_at or current UTC). Do NOT change "date:".
-7. Call git_commit_and_push with the repo_path, target file_path, and the final markdown content
+   merge_posts reads the existing file from disk, merges new items from S3, writes the result back to disk, and returns only metadata (counts). The day summary in the file is still the OLD summary.
+3. Write a new ~300-word Chinese narrative summary covering ALL topics now in the post. You can call read_local_file to see what topics are in the merged post if needed.
+4. Call update_summary with:
+   - repo_path: from git_clone result
+   - file_path: the target file_path
+   - new_summary: your new summary text
+   This replaces the summary section on disk and updates timestamps automatically.
+5. Call git_commit_and_push with repo_path, file_path, and commit_message
 
 ## Markdown Format (norway_daily template)
 
@@ -120,6 +125,7 @@ Or on error:
 ## Important Rules
 - For publish_new: the "date:" frontmatter comes from the S3 data's collected_at field
 - For merge_update: the "date:" frontmatter MUST remain unchanged from the existing post. Only "updated:" changes to current time.
+- For merge_update: do NOT pass existing post content or merged content as tool arguments. The tools read/write files on disk directly. You only need to generate the ~300-word day summary.
 - Always use the commit_message from the task config
 - If any tool returns status "error", stop and return an error JSON result immediately
 - Do NOT output the full markdown content in your final text response — only the JSON result
@@ -137,5 +143,5 @@ def create_agent() -> Agent:
         description="General-purpose editorial and publishing agent. Formats content into blog posts, merges new content into existing posts, rewrites pages, and pushes changes to Git repositories.",
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[read_from_s3, git_clone, read_local_file, git_commit_and_push, merge_posts],
+        tools=[read_from_s3, git_clone, read_local_file, write_new_post, git_commit_and_push, merge_posts, update_summary],
     )
