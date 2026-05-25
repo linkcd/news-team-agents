@@ -219,12 +219,14 @@ categories: [每日新闻, 挪威]
 |------|---------|
 | `read_from_s3(bucket, key)` | Read collected items JSON from S3 (used by publish_new) |
 | `git_clone(repo, branch)` | Clone repo locally (authenticated via AgentCore Identity) |
-| `read_local_file(repo_path, file_path)` | Read file from cloned repo (avoids private repo auth issues) |
-| `merge_posts(existing_content, s3_bucket, s3_key, strategy)` | Deterministic structural merge — reads new items from S3, inserts into correct sections, renumbers. LLM only rewrites the day summary. |
-| `git_commit_and_push(repo_path, file_path, content, commit_message)` | Write file, commit, and push |
+| `read_local_file(repo_path, file_path)` | Read file from cloned repo |
+| `write_new_post(repo_path, file_path, content)` | Write LLM-generated markdown to disk (used by publish_new) |
+| `merge_posts(repo_path, file_path, s3_bucket, s3_key, strategy)` | File-based deterministic merge — reads existing post from disk, merges with S3 data, writes result back to disk. Returns only metadata. |
+| `update_summary(repo_path, file_path, new_summary)` | Replaces day summary section on disk, updates timestamps. Only tool that needs LLM-generated content. |
+| `git_commit_and_push(repo_path, file_path, commit_message)` | Commits file already on disk and pushes |
 
-For `publish_new`: the LLM writes markdown directly from the template format in its system prompt.
-For `merge_update`: the `merge_posts` tool handles the structural merge deterministically (preserving all existing items, inserting new items at top of each section, renumbering). The LLM only rewrites the ~300-word day summary. This pattern follows Anthropic's recommendation to never ask an LLM to reproduce existing content verbatim — deterministic code preserves existing content while the LLM handles only the creative work.
+For `publish_new`: the LLM writes markdown via `write_new_post`, then `git_commit_and_push` commits it.
+For `merge_update`: all tools are file-based — `merge_posts` reads/writes disk, `update_summary` patches the summary section, `git_commit_and_push` commits. The LLM only generates the ~300-word day summary (~400 output tokens). This reduced Publisher runtime from ~10 min to ~1 min by eliminating LLM verbatim copying of large content into tool arguments.
 
 ## Authentication
 
@@ -249,15 +251,16 @@ Git operations use AgentCore Identity (`@requires_api_key(provider_name="github-
 
 ```bash
 agentcore dev                    # local development
-python3 -m pytest tests/ -v      # run unit tests (23 tests)
+python3 -m pytest tests/ -v      # run unit tests (44 tests)
 agentcore deploy -y              # deploy to AWS
 agentcore invoke '{"task": {...}}' --stream  # invoke
 ```
 
 ## Design Principles
 
-- **Deterministic merge, creative summary**: For `merge_update`, the `merge_posts` tool handles structural merge (insert, renumber, preserve existing items) while the LLM only writes the ~300-word day summary. This follows Anthropic's best practice: never ask the LLM to reproduce existing content verbatim.
-- **LLM writes markdown directly for new posts**: For `publish_new`, the LLM reads structured JSON from S3 and produces the full markdown in one pass.
-- **Tools read data from source**: The `merge_posts` tool reads S3 directly (avoiding large JSON serialization through LLM tool arguments which can corrupt data).
+- **File-based tool I/O**: Tools read from and write to disk. The LLM never passes large content (existing posts, merged output) as tool arguments. This eliminates expensive verbatim token generation — the LLM only produces creative content (~300-word summary).
+- **Deterministic merge, creative summary**: `merge_posts` handles structural merge (insert, renumber, preserve) as pure Python. The LLM only writes the day summary via `update_summary`.
+- **LLM writes markdown directly for new posts**: For `publish_new`, the LLM reads structured JSON from S3 and produces the full markdown via `write_new_post`.
+- **Tools read data from source**: `merge_posts` reads S3 directly (avoiding large JSON serialization through LLM tool arguments).
 - **Git clone for private repo access**: Uses `git_clone` + `read_local_file` instead of raw.githubusercontent.com (which fails for private repos).
 - **Git as deployment trigger**: Publisher pushes to Git. Deployment (hexo, Jekyll, etc.) is handled by CI/CD in the target repo.

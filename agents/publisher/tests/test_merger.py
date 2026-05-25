@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -20,6 +22,14 @@ def _mock_s3_get(new_items, updated_items):
     mock_s3 = MagicMock()
     mock_s3.get_object.return_value = {"Body": mock_body}
     return mock_s3
+
+
+def _write_post(tmpdir, content, path="source/_posts/20260521-norway.md"):
+    full_path = os.path.join(tmpdir, path)
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    with open(full_path, "w") as f:
+        f.write(content)
+    return path
 
 
 def test_merge_posts_appends_new_items_to_correct_section():
@@ -89,27 +99,30 @@ categories: [每日新闻, 挪威]
         "regenerate_day_summary": False,
     })
 
-    mock_s3 = _mock_s3_get(new_items, [])
-    with patch("tools.merger.boto3") as mock_boto3:
-        mock_boto3.client.return_value = mock_s3
-        result = merge_posts(
-            existing_content=existing_content,
-            s3_bucket="test-bucket",
-            s3_key="test-key.json",
-            strategy=strategy,
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        post_path = _write_post(tmpdir, existing_content)
+        mock_s3 = _mock_s3_get(new_items, [])
+        with patch("tools.merger.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_s3
+            result = json.loads(merge_posts(
+                repo_path=tmpdir,
+                file_path=post_path,
+                s3_bucket="test-bucket",
+                s3_key="test-key.json",
+                strategy=strategy,
+            ))
 
-    result = json.loads(result)
-    assert result["status"] == "success"
-    content = result["content"]
-    assert "奥斯陆新地铁线路开工" in content
-    assert "NRK Oslo" in content
-    assert "### 1. 议会通过新法案" in content
-    assert "### 2. 奥斯陆新地铁线路开工" in content
-    assert "### 3. 北欧合作会议召开" in content
-    assert result["new_items_added"] == 1
-    assert result["existing_items_updated"] == 0
-    assert result["total_items"] == 3
+        assert result["status"] == "success"
+        with open(os.path.join(tmpdir, post_path)) as f:
+            content = f.read()
+        assert "奥斯陆新地铁线路开工" in content
+        assert "NRK Oslo" in content
+        assert "### 1. 议会通过新法案" in content
+        assert "### 2. 奥斯陆新地铁线路开工" in content
+        assert "### 3. 北欧合作会议召开" in content
+        assert result["new_items_added"] == 1
+        assert result["existing_items_updated"] == 0
+        assert result["total_items"] == 3
 
 
 def test_merge_posts_prepends_new_items_when_strategy_says_so():
@@ -164,22 +177,24 @@ categories: [每日新闻, 挪威]
         "renumber": True,
     })
 
-    mock_s3 = _mock_s3_get(new_items, [])
-    with patch("tools.merger.boto3") as mock_boto3:
-        mock_boto3.client.return_value = mock_s3
-        result = merge_posts(
-            existing_content=existing_content,
-            s3_bucket="test-bucket",
-            s3_key="test-key.json",
-            strategy=strategy,
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        post_path = _write_post(tmpdir, existing_content)
+        mock_s3 = _mock_s3_get(new_items, [])
+        with patch("tools.merger.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_s3
+            result = json.loads(merge_posts(
+                repo_path=tmpdir,
+                file_path=post_path,
+                s3_bucket="test-bucket",
+                s3_key="test-key.json",
+                strategy=strategy,
+            ))
 
-    result = json.loads(result)
-    assert result["status"] == "success"
-    content = result["content"]
-    # New item should be first (prepended)
-    assert "### 1. 新新闻B" in content
-    assert "### 2. 旧新闻A" in content
+        assert result["status"] == "success"
+        with open(os.path.join(tmpdir, post_path)) as f:
+            content = f.read()
+        assert "### 1. 新新闻B" in content
+        assert "### 2. 旧新闻A" in content
 
 
 def test_merge_posts_updates_existing_item():
@@ -240,26 +255,29 @@ categories: [每日新闻, 挪威]
         "regenerate_day_summary": False,
     })
 
-    mock_s3 = _mock_s3_get([], updated_items)
-    with patch("tools.merger.boto3") as mock_boto3:
-        mock_boto3.client.return_value = mock_s3
-        result = merge_posts(
-            existing_content=existing_content,
-            s3_bucket="test-bucket",
-            s3_key="test-key.json",
-            strategy=strategy,
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        post_path = _write_post(tmpdir, existing_content)
+        mock_s3 = _mock_s3_get([], updated_items)
+        with patch("tools.merger.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_s3
+            result = json.loads(merge_posts(
+                repo_path=tmpdir,
+                file_path=post_path,
+                s3_bucket="test-bucket",
+                s3_key="test-key.json",
+                strategy=strategy,
+            ))
 
-    result = json.loads(result)
-    assert result["status"] == "success"
-    content = result["content"]
-    assert "反对党表示将继续抗争" in content
-    assert "VG" in content
-    assert "https://vg.no/article/456" in content
-    assert "更新于 11:00 UTC" in content
-    assert "https://nrk.no/article/123" in content
-    assert result["new_items_added"] == 0
-    assert result["existing_items_updated"] == 1
+        assert result["status"] == "success"
+        with open(os.path.join(tmpdir, post_path)) as f:
+            content = f.read()
+        assert "反对党表示将继续抗争" in content
+        assert "VG" in content
+        assert "https://vg.no/article/456" in content
+        assert "更新于 11:00 UTC" in content
+        assert "https://nrk.no/article/123" in content
+        assert result["new_items_added"] == 0
+        assert result["existing_items_updated"] == 1
 
 
 def test_merge_posts_handles_empty_existing_content():
@@ -267,19 +285,22 @@ def test_merge_posts_handles_empty_existing_content():
 
     strategy = json.dumps({"new_items": "append_per_section", "renumber": True})
 
-    mock_s3 = _mock_s3_get([{"title_zh": "X", "category": "domestic", "summary_zh": "Y", "sources": []}], [])
-    with patch("tools.merger.boto3") as mock_boto3:
-        mock_boto3.client.return_value = mock_s3
-        raw = merge_posts(
-            existing_content="",
-            s3_bucket="test-bucket",
-            s3_key="test-key.json",
-            strategy=strategy,
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        post_path = _write_post(tmpdir, "")
+        mock_s3 = _mock_s3_get([{"title_zh": "X", "category": "domestic", "summary_zh": "Y", "sources": []}], [])
+        with patch("tools.merger.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_s3
+            raw = merge_posts(
+                repo_path=tmpdir,
+                file_path=post_path,
+                s3_bucket="test-bucket",
+                s3_key="test-key.json",
+                strategy=strategy,
+            )
 
-    result = json.loads(raw)
-    assert result["status"] == "error"
-    assert "existing content" in result["error"].lower()
+        result = json.loads(raw)
+        assert result["status"] == "error"
+        assert "existing content" in result["error"].lower()
 
 
 def test_merge_posts_puts_timestamp_before_more_tag():
@@ -320,20 +341,25 @@ categories: [每日新闻, 挪威]
 """
 
     strategy = json.dumps({"new_items": "prepend_per_section", "renumber": True})
-    mock_s3 = _mock_s3_get([], [])
-    with patch("tools.merger.boto3") as mock_boto3:
-        mock_boto3.client.return_value = mock_s3
-        result = json.loads(merge_posts(
-            existing_content=existing_content,
-            s3_bucket="b",
-            s3_key="k",
-            strategy=strategy,
-        ))
 
-    assert result["status"] == "success"
-    content = result["content"]
-    update_pos = content.find("*最后更新:")
-    more_pos = content.find("<!-- more -->")
-    assert update_pos != -1
-    assert more_pos != -1
-    assert update_pos < more_pos
+    with tempfile.TemporaryDirectory() as tmpdir:
+        post_path = _write_post(tmpdir, existing_content)
+        mock_s3 = _mock_s3_get([], [])
+        with patch("tools.merger.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_s3
+            result = json.loads(merge_posts(
+                repo_path=tmpdir,
+                file_path=post_path,
+                s3_bucket="b",
+                s3_key="k",
+                strategy=strategy,
+            ))
+
+        assert result["status"] == "success"
+        with open(os.path.join(tmpdir, post_path)) as f:
+            content = f.read()
+        update_pos = content.find("*最后更新:")
+        more_pos = content.find("<!-- more -->")
+        assert update_pos != -1
+        assert more_pos != -1
+        assert update_pos < more_pos
