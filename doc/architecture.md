@@ -196,7 +196,35 @@ Key implementation details:
 - **`bedrock_agentcore.runtime.build_runtime_url`** builds the HTTPS invocation URL from an agent ARN
 - **`SigV4HTTPXAuth`** (custom `httpx.Auth` subclass in `tools/sigv4_auth.py`) signs each HTTP request with AWS SigV4
 - **SSE streaming** keeps the connection alive during long-running agent tasks — each streamed event resets the idle timeout
-- **Server-side** uses `StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=True)` for all agents
+- **Server-side** uses `StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False)` for all agents (legacy mode avoids chunked artifact streaming bug)
+
+### Concurrency: ping_handler for HEALTHY_BUSY Signaling
+
+AgentCore runtimes run in serverless microVMs. The control plane polls each instance via `GET /ping` to determine routing. However, the `serve_a2a()` function in `bedrock-agentcore` does NOT automatically track active requests — unlike the non-A2A `BedrockAgentCoreApp` which has built-in `_active_tasks` tracking. Without intervention, the A2A path always reports `HEALTHY`, causing the control plane to route concurrent requests to the same instance. Since the Strands `Agent` class enforces single-threaded execution via `_invocation_lock`, a second request would fail with `ConcurrencyException`.
+
+**Fix**: Each agent provides a custom `ping_handler` to `serve_a2a()` that checks the agent's invocation lock:
+
+```python
+# ping_health.py (identical in all 3 agents)
+from bedrock_agentcore.runtime.models import PingStatus
+
+def make_ping_handler(lock):
+    def ping_handler() -> PingStatus:
+        if lock.locked():
+            return PingStatus.HEALTHY_BUSY
+        return PingStatus.HEALTHY
+    return ping_handler
+
+# main.py
+agent = create_agent()
+ping_handler = make_ping_handler(agent._invocation_lock)
+serve_a2a(
+    StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False),
+    ping_handler=ping_handler,
+)
+```
+
+When the control plane sees `HEALTHY_BUSY`, it spins up a new microVM instance for the next request. This enables concurrent invocations (e.g., a scheduled run and an ad-hoc run arriving within minutes of each other) to execute independently on separate instances.
 
 ### Data Flow
 Bulk article data passes via S3, not through the Orchestrator's LLM context:
@@ -347,6 +375,7 @@ Each agent is evaluated independently:
 | Topic matching | LLM semantic similarity (no explicit IDs) | Most flexible; handles paraphrased titles, different angles on same event. Non-deterministic but acceptable for editorial use. |
 | Topic updates | Regenerate summary + changelog note | Reads naturally; changelog provides transparency on when/what was added |
 | Inter-agent comms | strands `A2AAgent` + SSE streaming + SigV4 | Native A2A protocol; SSE streaming avoids idle timeouts on long tasks |
+| Concurrency handling | Custom `ping_handler` reporting `HEALTHY_BUSY` | A2A `serve_a2a()` doesn't auto-track active requests (unlike non-A2A path); ping_handler bridges this gap so control plane routes concurrent requests to new instances |
 | Data passing | S3 intermediate storage | Avoids large payloads in Orchestrator LLM context; provides audit trail |
 | Dedup ownership | Collector reads existing post from GitHub | Collector is self-contained; Orchestrator stays lightweight |
 | Hexo deployment | GitHub Action (not in Publisher container) | Decouples LLM work from build toolchain; easier to debug |
