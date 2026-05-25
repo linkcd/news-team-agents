@@ -32,12 +32,22 @@ def _passthrough_decorator(**kwargs):
         return func
     return decorator
 
+from enum import Enum
+
+class _PingStatus(Enum):
+    HEALTHY = "HEALTHY"
+    HEALTHY_BUSY = "HEALTHY_BUSY"
+
 bedrock_agentcore_mock = MagicMock()
 bedrock_agentcore_identity_mock = MagicMock()
 bedrock_agentcore_identity_mock.requires_api_key = _passthrough_decorator
+bedrock_agentcore_runtime_mock = MagicMock()
+bedrock_agentcore_models_mock = MagicMock()
+bedrock_agentcore_models_mock.PingStatus = _PingStatus
 sys.modules["bedrock_agentcore"] = bedrock_agentcore_mock
 sys.modules["bedrock_agentcore.identity"] = bedrock_agentcore_identity_mock
-sys.modules["bedrock_agentcore.runtime"] = MagicMock()
+sys.modules["bedrock_agentcore.runtime"] = bedrock_agentcore_runtime_mock
+sys.modules["bedrock_agentcore.runtime.models"] = bedrock_agentcore_models_mock
 
 import pytest
 

@@ -18,10 +18,19 @@ sys.modules["strands.multiagent"] = MagicMock()
 sys.modules["strands.multiagent.a2a"] = MagicMock()
 
 # Stub out bedrock_agentcore for testing
+from enum import Enum
+
+class _PingStatus(Enum):
+    HEALTHY = "HEALTHY"
+    HEALTHY_BUSY = "HEALTHY_BUSY"
+
 agentcore_mock = MagicMock()
 agentcore_mock.runtime.build_runtime_url = lambda arn, region=None: f"https://bedrock-agentcore.eu-west-1.amazonaws.com/runtimes/{arn}/invocations"
+agentcore_models_mock = MagicMock()
+agentcore_models_mock.PingStatus = _PingStatus
 sys.modules["bedrock_agentcore"] = agentcore_mock
 sys.modules["bedrock_agentcore.runtime"] = agentcore_mock.runtime
+sys.modules["bedrock_agentcore.runtime.models"] = agentcore_models_mock
 
 # Stub out boto3 and botocore for testing (not installed in test env)
 boto3_mock = MagicMock()
