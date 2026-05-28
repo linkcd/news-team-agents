@@ -3,7 +3,7 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from config import MODEL_ID
-from tools import read_from_s3, git_clone, read_local_file, write_new_post, git_commit_and_push, merge_posts, update_summary
+from tools import read_from_s3, git_clone, read_local_file, write_new_post, git_commit_and_push, merge_posts, update_summary, verify_deploy
 
 # read_from_s3: used by publish_new to get collected items
 # git_clone: clones repo with GitHub token auth
@@ -24,6 +24,7 @@ Pipeline:
 2. Call git_clone to clone the target repo
 3. Write the full markdown post yourself following the format below, then call write_new_post with repo_path, file_path, and your markdown content to save it to disk
 4. Call git_commit_and_push with repo_path, file_path, and commit_message
+5. Call verify_deploy with the commit_sha from git_commit_and_push result
 
 ### merge_update
 Merge new content into an existing post using file-based tools (no large content in arguments).
@@ -44,6 +45,7 @@ Pipeline:
    - new_summary: your new summary text
    This replaces the summary section on disk and updates timestamps automatically.
 5. Call git_commit_and_push with repo_path, file_path, and commit_message
+6. Call verify_deploy with the commit_sha from git_commit_and_push result
 
 ## Markdown Format (norway_daily template)
 
@@ -143,5 +145,5 @@ def create_agent() -> Agent:
         description="General-purpose editorial and publishing agent. Formats content into blog posts, merges new content into existing posts, rewrites pages, and pushes changes to Git repositories.",
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[read_from_s3, git_clone, read_local_file, write_new_post, git_commit_and_push, merge_posts, update_summary],
+        tools=[read_from_s3, git_clone, read_local_file, write_new_post, git_commit_and_push, merge_posts, update_summary, verify_deploy],
     )

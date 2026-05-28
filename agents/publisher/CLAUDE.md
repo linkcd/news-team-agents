@@ -224,9 +224,10 @@ categories: [每日新闻, 挪威]
 | `merge_posts(repo_path, file_path, s3_bucket, s3_key, strategy)` | File-based deterministic merge — reads existing post from disk, merges with S3 data, writes result back to disk. Returns only metadata. |
 | `update_summary(repo_path, file_path, new_summary)` | Replaces day summary section on disk, updates timestamps. Only tool that needs LLM-generated content. |
 | `git_commit_and_push(repo_path, file_path, commit_message)` | Commits file already on disk and pushes |
+| `verify_deploy(commit_sha)` | Checks GitHub Actions triggered for the commit; dispatches workflow manually if not |
 
-For `publish_new`: the LLM writes markdown via `write_new_post`, then `git_commit_and_push` commits it.
-For `merge_update`: all tools are file-based — `merge_posts` reads/writes disk, `update_summary` patches the summary section, `git_commit_and_push` commits. The LLM only generates the ~300-word day summary (~400 output tokens). This reduced Publisher runtime from ~10 min to ~1 min by eliminating LLM verbatim copying of large content into tool arguments.
+For `publish_new`: the LLM writes markdown via `write_new_post`, then `git_commit_and_push` commits it, then `verify_deploy` ensures the deploy pipeline fires.
+For `merge_update`: all tools are file-based — `merge_posts` reads/writes disk, `update_summary` patches the summary section, `git_commit_and_push` commits, `verify_deploy` ensures deploy. The LLM only generates the ~300-word day summary (~400 output tokens). This reduced Publisher runtime from ~10 min to ~1 min by eliminating LLM verbatim copying of large content into tool arguments.
 
 ## Authentication
 
@@ -251,7 +252,7 @@ Git operations use AgentCore Identity (`@requires_api_key(provider_name="github-
 
 ```bash
 agentcore dev                    # local development
-python3 -m pytest tests/ -v      # run unit tests (44 tests)
+python3 -m pytest tests/ -v      # run unit tests (50 tests)
 agentcore deploy -y              # deploy to AWS
 agentcore invoke '{"task": {...}}' --stream  # invoke
 ```
