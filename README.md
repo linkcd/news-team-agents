@@ -128,6 +128,7 @@ cp agents/orchestrator/.env.example agents/orchestrator/.env
 | `COLLECTOR_RUNTIME_ARN` | Collector agent ARN | Orchestrator only |
 | `PUBLISHER_RUNTIME_ARN` | Publisher agent ARN | Orchestrator only |
 | `S3_BUCKET` | Data storage bucket | Orchestrator only |
+| `BLOG_REPO` | Target Git repository (owner/repo) | Orchestrator, Publisher |
 | `MODEL_ID` | Claude model ID (optional) | All agents |
 
 **Notes:**

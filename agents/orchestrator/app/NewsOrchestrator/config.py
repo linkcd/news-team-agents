@@ -5,16 +5,16 @@ AWS_REGION = os.environ.get("AWS_REGION", "eu-west-1")
 
 COLLECTOR_RUNTIME_ARN = os.environ.get(
     "COLLECTOR_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>",
+    "",  # Must be set via environment variable
 )
 PUBLISHER_RUNTIME_ARN = os.environ.get(
     "PUBLISHER_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>",
+    "",  # Must be set via environment variable
 )
 
-S3_BUCKET = os.environ.get("S3_BUCKET", "news-agent-data-example")
+S3_BUCKET = os.environ.get("S3_BUCKET", "")  # Must be set via environment variable
 
-BLOG_REPO = "example/blog"
+BLOG_REPO = os.environ.get("BLOG_REPO", "")  # Must be set via environment variable (e.g., "owner/repo")
 BLOG_BRANCH = "main"
 
 NEWS_SOURCES = [
