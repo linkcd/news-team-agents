@@ -1,6 +1,6 @@
 # News Team Agents
 
-Multi-agent news collection and publishing system built on AWS Bedrock AgentCore. Automatically collects Norwegian news from RSS feeds every 6 hours, translates and summarizes content to Chinese, and publishes to a Hexo blog at [claw-blog.feng.lu](https://claw-blog.feng.lu/).
+Multi-agent news collection and publishing system built on AWS Bedrock AgentCore. Automatically collects news from RSS feeds, translates and summarizes content, and publishes to Git-based blogs (Hexo, Jekyll, etc.).
 
 ## Overview
 
@@ -9,7 +9,7 @@ This system demonstrates a microservices-based agent architecture where each age
 - **Reusable**: General-purpose interfaces for use by other workflows
 - **Specialized**: Focused on a single responsibility
 
-The system runs 4 times daily (every 6 hours) via AWS EventBridge, collecting stories from the last 6-hour window, consolidating related articles into topics, and publishing summarized content.
+The system can be configured to run on any schedule via AWS EventBridge, collecting stories from configurable time windows, consolidating related articles into topics, and publishing summarized content.
 
 ## Architecture
 
@@ -36,7 +36,7 @@ General-purpose editorial and publishing agent. Formats content into blog posts,
 - Topic-based content organization
 
 ### 3. Orchestrator Agent (`agents/orchestrator/`)
-Domain-specific workflow coordinator for Norwegian news. Invokes Collector and Publisher with the right parameters, handles retry logic, and makes run-level decisions.
+Domain-specific workflow coordinator. Invokes Collector and Publisher with the right parameters, handles retry logic, and makes run-level decisions. Can be customized for different news sources and workflows.
 
 **Key Features:**
 - A2A protocol client for agent invocation
@@ -57,7 +57,7 @@ EventBridge (cron) → Lambda → Orchestrator
                                                ↓
                                           Git Push
                                                ↓
-                                      GitHub Action (hexo deploy)
+                                      GitHub Action (CI/CD deploy)
 ```
 
 ## Tech Stack
@@ -186,19 +186,11 @@ cd agents/collector && agentcore invoke '{"task": {...}}' --stream
 ## Design Principles
 
 1. **General-purpose agents**: Collector and Publisher accept arbitrary tasks via their interfaces
-2. **Domain-specific coordinator**: Orchestrator encodes the business logic specific to Norwegian news
+2. **Domain-specific coordinator**: Orchestrator encodes the business logic for your specific workflow
 3. **Data through S3, not context**: Bulk content never passes through LLM context windows
 4. **Deterministic structural work**: Multi-run merge, dedup, and renumbering are Python code
 5. **LLM for creative work only**: Translation, summarization, topic consolidation
 6. **Topic-based consolidation**: Related articles merged into comprehensive topics with multiple sources
-
-## Deployment Status
-
-- **Collector**: Runtime ID `newscollector_NewsCollector-EhrHzp4oFi`
-- **Publisher**: Runtime ID `newspublisher_NewsPublisher-OZnqGfD4D2`
-- **Orchestrator**: Runtime ID `newsorchestrator_NewsOrchestrator-255wUd9gwc`
-- **S3 Bucket**: `news-agent-data-548129671048` (eu-west-1, 7-day lifecycle)
-- **Schedule**: `cron(0 5,11,17,23 * * ? *)` (every 6 hours)
 
 ## Observability
 
