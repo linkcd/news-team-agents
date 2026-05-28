@@ -5,16 +5,16 @@ AWS_REGION = os.environ.get("AWS_REGION", "eu-west-1")
 
 COLLECTOR_RUNTIME_ARN = os.environ.get(
     "COLLECTOR_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newscollector_NewsCollector-EhrHzp4oFi",
+    "",  # Must be set via environment variable
 )
 PUBLISHER_RUNTIME_ARN = os.environ.get(
     "PUBLISHER_RUNTIME_ARN",
-    "arn:aws:bedrock-agentcore:eu-west-1:548129671048:runtime/newspublisher_NewsPublisher-OZnqGfD4D2",
+    "",  # Must be set via environment variable
 )
 
-S3_BUCKET = os.environ.get("S3_BUCKET", "news-agent-data-548129671048")
+S3_BUCKET = os.environ.get("S3_BUCKET", "")  # Must be set via environment variable
 
-BLOG_REPO = "claw-lu/hexo-blog"
+BLOG_REPO = os.environ.get("BLOG_REPO", "")  # Must be set via environment variable (e.g., "owner/repo")
 BLOG_BRANCH = "main"
 
 NEWS_SOURCES = [

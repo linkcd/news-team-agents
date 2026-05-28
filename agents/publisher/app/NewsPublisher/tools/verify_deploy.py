@@ -1,12 +1,13 @@
+import os
 import time
 
 import httpx
 from bedrock_agentcore.identity import requires_api_key
 from strands import tool
 
-REPO = "claw-lu/hexo-blog"
+REPO = os.environ.get("BLOG_REPO", "")  # Must be set via environment variable (e.g., "owner/repo")
 WORKFLOW_FILE = "deploy.yml"
-API_BASE = f"https://api.github.com/repos/{REPO}"
+API_BASE = f"https://api.github.com/repos/{REPO}" if REPO else ""
 
 
 @requires_api_key(provider_name="github-token", into="api_key")

@@ -1,7 +1,7 @@
 from strands import Agent
 from strands.models import BedrockModel
 
-from config import MODEL_ID, S3_BUCKET, NEWS_SOURCES
+from config import MODEL_ID, S3_BUCKET, BLOG_REPO, NEWS_SOURCES
 from tools import invoke_collector, invoke_publisher, verify_agents
 
 SYSTEM_PROMPT = """You are a workflow orchestration agent for Norwegian news collection and publishing.
@@ -30,7 +30,7 @@ Construct the task configuration for the Collector agent:
 - sources: ALL 11 Norwegian RSS feeds (passed from config in your tools)
 - filters:
   - time_window_hours: 6
-  - dedup_source: {"type": "github_file", "repo": "claw-lu/hexo-blog", "path": "{post_path}"} if NOT first run, else {"type": "none"}
+  - dedup_source: {"type": "github_file", "repo": "BLOG_REPO_PLACEHOLDER", "path": "{post_path}"} if NOT first run, else {"type": "none"}
 - processing:
   - extract_full_content: true
   - consolidate_topics: true
@@ -63,11 +63,11 @@ Construct the task configuration for the Publisher agent:
 - template: "norway_daily"
 
 If type is "publish_new":
-- output: {"repo": "claw-lu/hexo-blog", "branch": "main", "file_path": "{post_path}", "commit_message": "Add Norway news {date}"}
+- output: {"repo": "BLOG_REPO_PLACEHOLDER", "branch": "main", "file_path": "{post_path}", "commit_message": "Add Norway news {date}"}
 - editorial: {"generate_summary": true, "summary_word_count": 300, "summary_scope": "all_items"}
 
 If type is "merge_update":
-- target: {"repo": "claw-lu/hexo-blog", "branch": "main", "file_path": "{post_path}"}
+- target: {"repo": "BLOG_REPO_PLACEHOLDER", "branch": "main", "file_path": "{post_path}"}
 - merge_strategy: {"new_items": "prepend_per_section", "updated_items": "replace_summary_and_add_source", "renumber": true, "regenerate_day_summary": true}
 - editorial: {"generate_summary": true, "summary_word_count": 300, "summary_scope": "all_items"}
 
@@ -111,7 +111,8 @@ def create_agent() -> Agent:
     model = BedrockModel(model_id=MODEL_ID)
     sources_json = json.dumps(NEWS_SOURCES, indent=2)
     prompt = SYSTEM_PROMPT.replace("NEWS_AGENT_S3_BUCKET_PLACEHOLDER", S3_BUCKET)
-    prompt += f"\n\n## CONFIGURATION VALUES\n\n- S3 bucket: `{S3_BUCKET}`\n- News sources (pass ALL of these to the Collector):\n```json\n{sources_json}\n```\n"
+    prompt = prompt.replace("BLOG_REPO_PLACEHOLDER", BLOG_REPO)
+    prompt += f"\n\n## CONFIGURATION VALUES\n\n- S3 bucket: `{S3_BUCKET}`\n- Blog repository: `{BLOG_REPO}`\n- News sources (pass ALL of these to the Collector):\n```json\n{sources_json}\n```\n"
     return Agent(
         name="NewsOrchestrator",
         description="Workflow orchestrator for Norwegian news pipeline. Coordinates Collector and Publisher agents via A2A to produce daily Chinese-language news blog posts from Norwegian sources.",
