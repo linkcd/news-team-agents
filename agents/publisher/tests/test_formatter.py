@@ -1,3 +1,16 @@
+# Copyright 2026 news-agent contributors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 
 import pytest
@@ -106,3 +119,36 @@ def test_format_post_unknown_template_returns_error():
 
     assert result["status"] == "error"
     assert "template" in result["error"].lower()
+
+
+def test_format_post_escapes_untrusted_html():
+    from tools.formatter import format_post
+
+    items = json.dumps([
+        {
+            "title_zh": "<script>alert('title')</script>",
+            "category": "domestic",
+            "summary_zh": "<img src=x onerror=alert('summary')>",
+            "sources": [
+                {
+                    "url": "https://example.com/?a=1&b=2",
+                    "source_label": "<b>Source</b>",
+                    "published_at": "2026-05-21T09:30:00Z",
+                },
+            ],
+        },
+    ])
+
+    raw = format_post(
+        items=items,
+        template="norway_daily",
+        editorial_config=json.dumps({"day_summary": "<script>alert('summary')</script>"}),
+        date="2026-05-21",
+        time="05:00:00",
+    )
+    content = json.loads(raw)["content"]
+
+    assert "<script>" not in content
+    assert "<img " not in content
+    assert "<b>Source</b>" not in content
+    assert "&lt;script&gt;" in content

@@ -1,22 +1,36 @@
+# Copyright 2026 news-agent contributors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 
-def test_git_clone_clones_repo_to_temp_dir():
+def test_git_clone_clones_repo_to_temp_dir(tmp_path):
     from tools.git_ops import git_clone
 
+    clone_path = str(tmp_path / "publisher_abc")
     with patch("tools.git_ops.git.Repo") as MockRepo:
         mock_repo = MagicMock()
         MockRepo.clone_from.return_value = mock_repo
 
         with patch("tools.git_ops._clone_with_token") as mock_clone:
-            mock_clone.return_value = {"status": "success", "repo_path": "/tmp/publisher_abc"}
+            mock_clone.return_value = {"status": "success", "repo_path": clone_path}
             result = git_clone(repo="example/blog", branch="main")
 
     assert result["status"] == "success"
-    assert result["repo_path"] == "/tmp/publisher_abc"
+    assert result["repo_path"] == clone_path
     mock_clone.assert_called_once_with(repo="example/blog", branch="main")
 
 

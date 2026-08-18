@@ -1,0 +1,4 @@
+# Keep synthesized CDK templates for CDK NAG, but exclude generated asset
+# snapshots that duplicate application Dockerfiles and dependency lock files.
+**/cdk.out/asset*
+**/cdk.out/.cache*

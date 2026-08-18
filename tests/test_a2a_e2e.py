@@ -1,3 +1,16 @@
+# Copyright 2026 news-agent contributors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """End-to-end A2A integration tests covering all 3 agents.
 
 Run: cd tests && uv run --with "boto3>=1.43.0" --with "pytest>=8.0" --python 3.12 -- python -m pytest test_a2a_e2e.py -v

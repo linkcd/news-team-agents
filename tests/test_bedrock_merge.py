@@ -1,3 +1,16 @@
+# Copyright 2026 news-agent contributors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Direct Bedrock API test for merge_update.
 
 Tests whether the model can produce a merged markdown post given:
@@ -9,13 +22,16 @@ This rules out whether the problem is the model output size/timeout
 or something else in the Strands/A2A pipeline.
 """
 import json
+import os
+import tempfile
 import time
+from pathlib import Path
 
 import boto3
 
 MODEL_ID = "global.anthropic.claude-sonnet-4-6"
-EXISTING_POST_PATH = "/tmp/existing_post.md"
-NEW_ITEMS_PATH = "/tmp/new_items.json"
+EXISTING_POST_PATH = Path(os.environ.get("EXISTING_POST_PATH", "existing_post.md"))
+NEW_ITEMS_PATH = Path(os.environ.get("NEW_ITEMS_PATH", "new_items.json"))
 
 SYSTEM_PROMPT = """You are an editorial and publishing agent. You receive a merge_update task.
 
@@ -116,10 +132,16 @@ Merge the new items into the existing post following the rules in your system pr
     else:
         print(f"\n⚠️  PARTIAL: stop_reason={stop_reason}, items={item_count}")
 
-    # Save output for inspection
-    with open("/tmp/merged_output.md", "w") as f:
+    # Save output for inspection without using a predictable shared path.
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        prefix="merged_output_",
+        suffix=".md",
+        delete=False,
+    ) as f:
         f.write(output)
-    print("Output saved to /tmp/merged_output.md")
+        output_path = f.name
+    print(f"Output saved to {output_path}")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,16 @@
+# Copyright 2026 news-agent contributors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import os
 from unittest.mock import patch, MagicMock
@@ -28,7 +41,7 @@ def test_tools_are_importable():
     assert callable(git_commit_and_push)
 
 
-def test_publish_new_tool_sequence(sample_collection_data):
+def test_publish_new_tool_sequence(sample_collection_data, tmp_path):
     """Test the tool sequence for publish_new: read S3, clone, commit+push."""
     from tools.s3_reader import read_from_s3
     from tools.git_ops import git_clone, git_commit_and_push
@@ -48,8 +61,9 @@ def test_publish_new_tool_sequence(sample_collection_data):
     assert len(data["new_items"]) == 2
 
     # Step 2: Git clone
+    clone_path = str(tmp_path / "publisher_test")
     with patch("tools.git_ops._clone_with_token") as mock_clone:
-        mock_clone.return_value = {"status": "success", "repo_path": "/tmp/publisher_test"}
+        mock_clone.return_value = {"status": "success", "repo_path": clone_path}
         clone_result = git_clone(repo="example/blog", branch="main")
 
     assert clone_result["status"] == "success"
