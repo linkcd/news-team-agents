@@ -97,19 +97,15 @@ news-agent/
 
 ## Development
 
-### Active migration: new AWS account
+### Private deployment configuration
 
-The migration target is **<AWS_ACCOUNT_ID> / eu-west-1** using CLI profile
-`your-profile`. Follow [the account migration runbook](doc/account-migration.md).
+Follow [the account migration runbook](doc/account-migration.md).
 Its maintained CDK entrypoint is `agents/orchestrator/infra/`; it provisions the
 shared bucket and three independently deployable runtimes with explicit configuration.
-Cutover completed on 2026-11-22: publishing and scheduling are enabled in the new
-account, and the old account's schedule is disabled. For a preview deployment,
-explicitly set both switches to false; see the runbook before changing live settings.
-
-The GitHub publishing chain remains `example/blog` → `example/blog-site` →
-https://news.example.com. The generated per-agent CDK scaffolding describes the
-legacy deployment and must not be used to deploy the migration target.
+Copy `deployment.example.json` to git-ignored `deployment.json` and supply the
+account, bucket and GitHub destination locally. Never commit real deployment
+identifiers, credentials or operational evidence. The example disables publishing
+and scheduling for preview validation. CLI-generated CDK/state files are local-only.
 
 Scheduled-run verification and remaining operational work are tracked in
 [migration follow-ups](doc/migration-followups.md).
@@ -180,17 +176,17 @@ pytest tests/
 
 ### Deployment
 
-Use the maintained deployment app for account <AWS_ACCOUNT_ID>:
+Use the maintained deployment app with your private configuration and CLI profile:
 
 ```bash
 cd agents/orchestrator/infra
 npm ci
 npm test
-npm run synth -- --profile your-profile --quiet
+npm run synth -- --profile "$AWS_PROFILE" --quiet
 # After configuring Identity and bootstrapping the account (see runbook):
-npm run deploy -- NewsAgent-Foundation --profile your-profile
-npm run deploy -- NewsAgent-Collector NewsAgent-Publisher --profile your-profile
-npm run deploy -- NewsAgent-Orchestrator --profile your-profile
+npm run deploy -- NewsAgent-Foundation --profile "$AWS_PROFILE"
+npm run deploy -- NewsAgent-Collector NewsAgent-Publisher --profile "$AWS_PROFILE"
+npm run deploy -- NewsAgent-Orchestrator --profile "$AWS_PROFILE"
 ```
 
 ### Manual Invocation

@@ -1,0 +1,11 @@
+{
+  "account": "<AWS_ACCOUNT_ID>",
+  "region": "eu-west-1",
+  "bucketName": "<YOUR_DATA_BUCKET>",
+  "blogRepo": "<OWNER>/<BLOG_REPOSITORY>",
+  "blogBranch": "main",
+  "workflowFile": "deploy.yml",
+  "modelId": "global.anthropic.claude-sonnet-4-6",
+  "scheduleEnabled": false,
+  "publishingEnabled": false
+}

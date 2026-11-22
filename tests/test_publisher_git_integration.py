@@ -27,6 +27,7 @@ Prerequisites:
 """
 
 import json
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -34,10 +35,14 @@ from datetime import datetime, timezone
 import boto3
 import pytest
 
-AWS_REGION = "eu-west-1"
-PUBLISHER_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>"
-TARGET_REPO = "example/blog"
-TARGET_BRANCH = "main"
+AWS_REGION = os.environ.get("AWS_REGION", "eu-west-1")
+PUBLISHER_RUNTIME_ARN = os.environ.get("PUBLISHER_RUNTIME_ARN", "")
+TARGET_REPO = os.environ.get("BLOG_REPO", "")
+TARGET_BRANCH = os.environ.get("BLOG_BRANCH", "main")
+pytestmark = pytest.mark.skipif(
+    os.environ.get("RUN_LIVE_TESTS") != "true" or not PUBLISHER_RUNTIME_ARN or not TARGET_REPO,
+    reason="Explicit live-test opt-in and private runtime/repository configuration are required",
+)
 TEST_FILE_PATH = "source/_tests/agentcore-identity-test.md"
 
 

@@ -16,16 +16,22 @@
 Run: cd tests && uv run --with "boto3>=1.43.0" --with "pytest>=8.0" --python 3.12 -- python -m pytest test_a2a_e2e.py -v
 """
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 
 import boto3
 import pytest
 
-AWS_REGION = "eu-west-1"
-COLLECTOR_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>"
-PUBLISHER_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>"
-ORCHESTRATOR_RUNTIME_ARN = "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>"
+AWS_REGION = os.environ.get("AWS_REGION", "eu-west-1")
+COLLECTOR_RUNTIME_ARN = os.environ.get("COLLECTOR_RUNTIME_ARN", "")
+PUBLISHER_RUNTIME_ARN = os.environ.get("PUBLISHER_RUNTIME_ARN", "")
+ORCHESTRATOR_RUNTIME_ARN = os.environ.get("ORCHESTRATOR_RUNTIME_ARN", "")
+pytestmark = pytest.mark.skipif(
+    os.environ.get("RUN_LIVE_TESTS") != "true"
+    or not all((COLLECTOR_RUNTIME_ARN, PUBLISHER_RUNTIME_ARN, ORCHESTRATOR_RUNTIME_ARN)),
+    reason="Explicit live-test opt-in and private runtime ARN configuration are required",
+)
 
 
 @pytest.fixture

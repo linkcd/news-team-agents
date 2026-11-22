@@ -1,6 +1,6 @@
 # Migration follow-ups
 
-Migration target: account **<AWS_ACCOUNT_ID>**, region **eu-west-1**.
+Deployment targets and execution evidence are kept in ignored private configuration.
 See [the migration runbook](account-migration.md) for deployment details and rollback.
 
 ## Scheduled-run verification — in progress
@@ -19,7 +19,7 @@ alone is not an end-to-end success. A run with no new content may legitimately
 finish with `publish: null`.
 
 Expected schedule: **05:00, 11:00, 17:00, 23:00 UTC**.
-New account's rule must stay enabled; old account <AWS_ACCOUNT_ID>'s rule must stay disabled.
+The new account's rule must stay enabled; the old account's rule must stay disabled.
 
 ## Deferred TODOs
 
@@ -54,7 +54,7 @@ articles when articles exist in the collection window.
 - [ ] Complete 24–48 hours of successful scheduled-run observation.
 - [ ] Inventory dependencies on the old runtime ARNs, data bucket and credential provider.
 - [ ] Confirm the new deployment can operate independently and preserve required diagnostic evidence.
-- [ ] Remove only obsolete news-agent stacks/resources from account <AWS_ACCOUNT_ID>.
+- [ ] Remove only obsolete news-agent stacks/resources from the old account.
 - [ ] Check retained data buckets, logs, build assets, ECR images and KMS resources for cleanup needs.
 - [ ] Preserve shared resources used by other applications in the old account.
 - [ ] Update legacy deployment documentation/scaffolding after retirement.

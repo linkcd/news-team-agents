@@ -23,8 +23,8 @@ def test_agent_refuses_to_start_without_required_configuration(monkeypatch):
 def test_runtime_arns_must_belong_to_the_same_account(monkeypatch):
     import config
 
-    monkeypatch.setattr(config, "COLLECTOR_RUNTIME_ARN", "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/collector-id")
-    monkeypatch.setattr(config, "PUBLISHER_RUNTIME_ARN", "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/publisher-id")
+    monkeypatch.setattr(config, "COLLECTOR_RUNTIME_ARN", f"arn:aws:bedrock-agentcore:eu-west-1:{'0' * 12}:runtime/collector-id")
+    monkeypatch.setattr(config, "PUBLISHER_RUNTIME_ARN", f"arn:aws:bedrock-agentcore:eu-west-1:{'1' * 12}:runtime/publisher-id")
     monkeypatch.setattr(config, "BLOG_REPO", "example/blog")
     monkeypatch.setattr(config, "S3_BUCKET", "test-bucket")
     with pytest.raises(ValueError, match="same account"):

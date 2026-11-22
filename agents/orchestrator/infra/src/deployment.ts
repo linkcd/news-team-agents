@@ -4,7 +4,7 @@ import {
   aws_s3 as s3, aws_iam as iam, aws_logs as logs,
   aws_lambda as lambda, aws_events as events, aws_events_targets as targets,
 } from 'aws-cdk-lib';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export interface DeploymentConfig {
@@ -34,8 +34,11 @@ function validateConfiguration(config: DeploymentConfig): void {
   }
 }
 
-export function loadConfiguration(): DeploymentConfig {
-  const config = JSON.parse(readFileSync(resolve(__dirname, '../deployment.json'), 'utf8'));
+export function loadConfiguration(file = resolve(__dirname, '../deployment.json')): DeploymentConfig {
+  if (!existsSync(file)) {
+    throw new Error('Create the git-ignored deployment.json from deployment.example.json and supply your private settings');
+  }
+  const config = JSON.parse(readFileSync(file, 'utf8'));
   validateConfiguration(config);
   return config;
 }
@@ -75,10 +78,8 @@ function runtimeStack(app: App, kind: string, config: DeploymentConfig) {
   const spec = AgentCoreProjectSpecSchema.parse(JSON.parse(
     readFileSync(resolve(projectDir, 'agentcore/agentcore.json'), 'utf8'),
   ));
-  const cliTargets = JSON.parse(readFileSync(resolve(projectDir, 'agentcore/aws-targets.json'), 'utf8'));
-  if (cliTargets.length !== 1 || cliTargets[0].account !== config.account || cliTargets[0].region !== config.region) {
-    throw new Error(`${kind} CLI targets do not match deployment.json`);
-  }
+  // The maintained app uses one private configuration for all stacks. Legacy
+  // CLI targets and generated CDK state are local-only and are not consumed here.
   const title = kind[0].toUpperCase() + kind.slice(1);
   const stack = new Stack(app, `NewsAgent-${title}`, {
     env: { account: config.account, region: config.region },

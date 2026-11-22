@@ -1,17 +1,13 @@
 # News-Agent
 
-## Active Account Migration
+## Deployment Configuration and Privacy
 
-Account <AWS_ACCOUNT_ID> / eu-west-1 uses the maintained CDK app in
-`agents/orchestrator/infra/` and CLI profile `your-profile`.
-Read `doc/account-migration.md` for current commands and checkpoints. Use that app
-instead of `agentcore deploy` for the new account: the generated per-agent CDK
-scaffolding below retains old-account settings. The maintained app supplies runtime
-environment variables and downstream ARNs and creates the shared S3 bucket.
-Cutover completed on 2026-11-22. Both scheduling and publishing are enabled in the
-new account, and the old schedule is disabled. Runtime IDs in the historical
-sections below describe the old deployment; current IDs and validation results
-are in `doc/account-migration.md`.
+Use the maintained CDK app in `agents/orchestrator/infra/` and the generic runbook
+`doc/account-migration.md`. Real values belong in ignored `deployment.json`, local
+CLI targets/state and `.private/` notes. Never commit actual account IDs, resource
+ARNs/IDs, bucket names, private repository/site destinations, user/profile names,
+credentials or local user paths. Unit tests must use generated dummy identifiers.
+Do not publish old backup refs after a privacy history rewrite.
 
 Multi-agent news collection and publishing system built on AWS Bedrock AgentCore. Designed as independent microservices — each agent is reusable, independently deployable, and separately evaluable.
 

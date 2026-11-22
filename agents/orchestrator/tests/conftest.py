@@ -17,8 +17,9 @@ from unittest.mock import MagicMock
 
 # Account-independent fixture configuration, set before any module imports config.
 os.environ["AWS_REGION"] = "eu-west-1"
-os.environ["COLLECTOR_RUNTIME_ARN"] = "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/newscollector-test"
-os.environ["PUBLISHER_RUNTIME_ARN"] = "arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/newspublisher-test"
+test_account = "0" * 12
+os.environ["COLLECTOR_RUNTIME_ARN"] = f"arn:aws:bedrock-agentcore:eu-west-1:{test_account}:runtime/newscollector-test"
+os.environ["PUBLISHER_RUNTIME_ARN"] = f"arn:aws:bedrock-agentcore:eu-west-1:{test_account}:runtime/newspublisher-test"
 os.environ["S3_BUCKET"] = "news-agent-test-data"
 os.environ["BLOG_REPO"] = "example/blog"
 os.environ["BLOG_BRANCH"] = "main"

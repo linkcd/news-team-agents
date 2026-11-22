@@ -13,7 +13,7 @@ def configure(session, config):
     account = session.client("sts").get_caller_identity()["Account"]
     if account != config["account"]:
         raise ValueError(f"CLI account {account} does not match deployment account {config['account']}")
-    token = getpass("GitHub token for example/blog (hidden): ").strip()
+    token = getpass(f"GitHub token for {config.get('blogRepo', 'the target repository')} (hidden): ").strip()
     if not token:
         raise ValueError("A GitHub token is required")
     result = session.client("bedrock-agentcore-control").create_api_key_credential_provider(

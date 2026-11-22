@@ -12,3 +12,8 @@ node_modules/
 dist/
 cdk.out/
 scan-*/
+/.private/
+/.monitoring/
+agents/*/agentcore/aws-targets.json
+agents/*/agentcore/cdk/
+agents/orchestrator/infra/deployment.json
