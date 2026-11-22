@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Read-only scheduled-run observation. Detailed reports stay git-ignored."""
 import argparse
+import base64
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 import json
@@ -53,8 +54,38 @@ def completed_result(messages, slot):
                         and belongs_to_slot(value["run_time"], slot.replace(second=0, microsecond=0))):
                     return value
             except (ValueError, TypeError):
-                continue
+                recovered = recover_truncated_result(candidate, slot)
+                if recovered:
+                    return recovered
     return None
+
+
+def recover_truncated_result(text, slot):
+    """Recover intact fields only; observe() still verifies S3, Git and the site."""
+    if re.findall(r'"status"\s*:\s*"([^"]+)"', text) != ["success"]:
+        return None
+    if re.search(r'"dry_run"\s*:\s*true', text):
+        return None
+    run_time = re.search(r'"run_time"\s*:\s*"([^"]+)"', text)
+    new = re.search(r'"new_topics"\s*:\s*(\d+)\s*[,}]', text)
+    updated = re.search(r'"updated_topics"\s*:\s*(\d+)\s*[,}]', text)
+    publication = re.search(r'"publish"\s*:\s*', text)
+    if not all((run_time, new, updated, publication)):
+        return None
+    try:
+        if not belongs_to_slot(run_time[1], slot.replace(second=0, microsecond=0)):
+            return None
+        publish, _ = json.JSONDecoder().raw_decode(text[publication.end():].lstrip())
+        if publish is not None and not isinstance(publish, dict):
+            return None
+        if isinstance(publish, dict) and publish.get("dry_run"):
+            return None
+    except (ValueError, TypeError):
+        return None
+    return {"status": "success", "run_time": run_time[1], "log_reconstructed": True,
+            "collection": {"new_topics": int(new[1]), "updated_topics": int(updated[1]),
+                           "data_key": f"collections/{slot:%Y-%m-%d}/norway-news-{slot:%Y-%m-%d}-{slot:%H%M}.json"},
+            "publish": publish}
 
 
 def validate_result(result, collection):
@@ -68,6 +99,14 @@ def validate_result(result, collection):
     if new or updated:
         if not publish or publish.get("dry_run") or not re.fullmatch(r"[0-9a-f]{40}", publish.get("commit_sha") or ""):
             raise ValueError("New content has no confirmed live source commit")
+
+
+def validate_commit(commit, expected_path, slot):
+    committed = utc(commit["commit"]["committer"]["date"])
+    if not slot <= committed <= slot + timedelta(minutes=30):
+        raise ValueError("Source commit falls outside the scheduled run window")
+    if expected_path not in {item["filename"] for item in commit.get("files", [])}:
+        raise ValueError("Source commit does not change the expected daily post")
 
 
 def page_topic_count(html):
@@ -202,10 +241,21 @@ class Observer:
         if obj["LastModified"] < slot or collection.get("task_id") != f"norway-news-{slot:%Y-%m-%d}-{slot:%H%M}":
             raise ValueError("Stale or unrelated collection object")
         validate_result(result, collection)
-        evidence.update(data_key=key, new_topics=len(collection["new_items"]), updated_topics=len(collection["updated_items"]))
+        evidence.update(data_key=key, new_topics=len(collection["new_items"]), updated_topics=len(collection["updated_items"]),
+                        log_reconstructed=result.get("log_reconstructed", False))
         publish = result.get("publish")
         if publish:
             sha = publish["commit_sha"]
+            expected_path = f"source/_posts/{slot:%Y%m%d}-norway.md"
+            if publish.get("file_path") != expected_path:
+                raise ValueError("Unexpected publication path")
+            commit = self.github(f"repos/{self.config['blogRepo']}/commits/{sha}")
+            validate_commit(commit, expected_path, slot)
+            source = self.github(f"repos/{self.config['blogRepo']}/contents/{expected_path}?ref={sha}")
+            markdown = base64.b64decode(source["content"]).decode("utf-8")
+            source_count = len(re.findall(r"^### \d+\.\s+.+$", markdown, re.M))
+            if source_count != publish.get("total_items_in_post"):
+                raise ValueError("Reported topic count does not match the committed post")
             runs = self.github(f"repos/{self.config['blogRepo']}/actions/workflows/{self.config['workflowFile']}/runs?head_sha={sha}&per_page=10")["workflow_runs"]
             successful = [r for r in runs if r["status"] == "completed" and r["conclusion"] == "success"]
             if not successful:

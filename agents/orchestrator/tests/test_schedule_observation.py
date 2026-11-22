@@ -48,6 +48,32 @@ def test_intermediate_parameters_are_not_mistaken_for_completion(observation):
     assert observation.completed_result([json.dumps(parameters)], slot) is None
 
 
+def test_truncated_collection_key_can_be_reconstructed_for_external_verification(observation):
+    slot = observation.utc("2030-01-01T17:00:00Z")
+    damaged = '\n'.join([
+        '```json', '{', '"status":"success",', '"run_time":"2030-01-01T17:00:00Z",',
+        '"collection":{"new_topics":1,"updated_topics":0,', 'broken-tail-of-key"', '},',
+        '"publish":' + json.dumps({"action": "merge_update", "file_path": "source/_posts/20300101-norway.md",
+                                  "commit_sha": "a" * 40, "total_items_in_post": 3}), '}', '```',
+    ])
+    result = observation.completed_result([damaged], slot)
+    assert result["log_reconstructed"] is True
+    assert result["collection"]["data_key"] == "collections/2030-01-01/norway-news-2030-01-01-1700.json"
+    assert result["publish"]["commit_sha"] == "a" * 40
+
+
+def test_commit_evidence_must_match_the_scheduled_window_and_file(observation):
+    slot = observation.utc("2030-01-01T17:00:00Z")
+    path = "source/_posts/20300101-norway.md"
+    commit = {"commit": {"committer": {"date": "2030-01-01T17:05:00Z"}}, "files": [{"filename": path}]}
+    observation.validate_commit(commit, path, slot)
+    with pytest.raises(ValueError):
+        observation.validate_commit(commit, "unrelated.md", slot)
+    commit["commit"]["committer"]["date"] = "2030-01-01T15:00:00Z"
+    with pytest.raises(ValueError):
+        observation.validate_commit(commit, path, slot)
+
+
 def test_no_content_run_can_finish_without_publication(observation):
     result = {"status": "success", "collection": {"new_topics": 0, "updated_topics": 0}, "publish": None}
     observation.validate_result(result, {"new_items": [], "updated_items": []})

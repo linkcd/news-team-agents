@@ -8,7 +8,7 @@ See [the migration runbook](account-migration.md) for deployment details and rol
 The controlled Lambda-triggered live run passed, and the schedule was switched on
 2026-11-22. That is not yet proof of an automatic EventBridge-triggered run.
 
-- [ ] Verify the first automatic run after cutover (scheduled time recorded privately).
+- [x] Verify the first automatic run after cutover (evidence recorded privately).
 - [ ] Observe the following scheduled runs for at least 24 hours before retiring old resources.
 
 For each run, record the scheduled time, EventBridge invocation evidence, Lambda
@@ -71,6 +71,15 @@ applications, the existing GitHub repositories and the public website remain fun
 
 Cleanup requires a separate confirmation after the observation window.
 
+### 4. Resolve agent-side deployment-verification errors
+
+- [ ] Investigate HTTP 403 responses from the agent's GitHub Actions verification call.
+- [ ] Correct private token permissions or configuration as indicated by the response.
+- [ ] Verify both workflow-status reads and the intended fallback dispatch behavior.
+
+The first automatic run published successfully and its real GitHub deployment was
+verified independently. The agent-side verification warning still needs attention.
+
 ## Read-only observation helper
 
 Use `agents/orchestrator/infra/observe_schedule.py` to observe a 24- or 48-hour
@@ -92,3 +101,9 @@ The watcher needs this machine to remain available and the CLI sessions to remai
 valid. Authentication/network gaps are recorded as observation errors, never as
 successful runs. Use `--once` to recheck stored evidence without waiting. Public
 documentation should record only completion status, not private run identifiers.
+
+Some runtime stdout lines can be truncated. The observer can reconstruct intact
+result fields and the deterministic collection key, but still verifies S3 task
+identity/counts, the commit's time and changed file, the committed topic count,
+the GitHub deployment, and the public page before reporting success. Such results
+are marked `log_reconstructed` in the private report.
