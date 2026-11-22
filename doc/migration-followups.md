@@ -8,7 +8,7 @@ See [the migration runbook](account-migration.md) for deployment details and rol
 The controlled Lambda-triggered live run passed, and the schedule was switched on
 2026-11-22. That is not yet proof of an automatic EventBridge-triggered run.
 
-- [ ] Verify the first automatic run: **2026-11-22 17:00 UTC**.
+- [ ] Verify the first automatic run after cutover (scheduled time recorded privately).
 - [ ] Observe the following scheduled runs for at least 24 hours before retiring old resources.
 
 For each run, record the scheduled time, EventBridge invocation evidence, Lambda
@@ -22,6 +22,13 @@ Expected schedule: **05:00, 11:00, 17:00, 23:00 UTC**.
 The new account's rule must stay enabled; the old account's rule must stay disabled.
 
 ## Deferred TODOs
+
+### Privacy provider-cache follow-up
+
+- [ ] Repository owner requests provider cleanup of cached copies of the old history.
+
+Current files and reachable main history are sanitized. Provider caches and
+existing clones are separate; the cleanup details are in ignored private notes.
 
 ### 1. Add end-to-end failure and missed-run alerts
 
@@ -63,3 +70,25 @@ Acceptance: obsolete news-agent resources no longer incur avoidable cost; other
 applications, the existing GitHub repositories and the public website remain functional.
 
 Cleanup requires a separate confirmation after the observation window.
+
+## Read-only observation helper
+
+Use `agents/orchestrator/infra/observe_schedule.py` to observe a 24- or 48-hour
+window. It reads EventBridge metrics, Lambda/Orchestrator logs, S3 collections,
+GitHub deployment results and the public page. It does not trigger runs, publish
+content, change schedules or send alerts.
+
+```bash
+uv run --no-project --python 3.12 --with boto3 -- \
+  python agents/orchestrator/infra/observe_schedule.py \
+  --profile "$AWS_PROFILE" --old-profile "$OLD_AWS_PROFILE" \
+  --site-url "$BLOG_SITE_URL" --hours 24 \
+  --report .monitoring/scheduled-runs.json
+```
+
+Supply the profile names and site URL privately. Reports are restricted to ignored
+`.monitoring/` or `.private/` directories because they contain deployment evidence.
+The watcher needs this machine to remain available and the CLI sessions to remain
+valid. Authentication/network gaps are recorded as observation errors, never as
+successful runs. Use `--once` to recheck stored evidence without waiting. Public
+documentation should record only completion status, not private run identifiers.
