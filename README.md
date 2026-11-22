@@ -97,6 +97,23 @@ news-agent/
 
 ## Development
 
+### Active migration: new AWS account
+
+The migration target is **<AWS_ACCOUNT_ID> / eu-west-1** using CLI profile
+`your-profile`. Follow [the account migration runbook](doc/account-migration.md).
+Its maintained CDK entrypoint is `agents/orchestrator/infra/`; it provisions the
+shared bucket and three independently deployable runtimes with explicit configuration.
+Cutover completed on 2026-11-22: publishing and scheduling are enabled in the new
+account, and the old account's schedule is disabled. For a preview deployment,
+explicitly set both switches to false; see the runbook before changing live settings.
+
+The GitHub publishing chain remains `example/blog` → `example/blog-site` →
+https://news.example.com. The generated per-agent CDK scaffolding describes the
+legacy deployment and must not be used to deploy the migration target.
+
+Scheduled-run verification and remaining operational work are tracked in
+[migration follow-ups](doc/migration-followups.md).
+
 ### Prerequisites
 
 - AWS CLI configured with appropriate credentials
@@ -163,22 +180,24 @@ pytest tests/
 
 ### Deployment
 
-Agents must be deployed in order (Collector and Publisher first, then Orchestrator):
+Use the maintained deployment app for account <AWS_ACCOUNT_ID>:
 
 ```bash
-# Deploy Collector and Publisher
-cd agents/collector && agentcore deploy -y
-cd agents/publisher && agentcore deploy -y
-
-# Update runtime ARNs in orchestrator config
-# Edit: agents/orchestrator/app/NewsOrchestrator/config.py
-# Edit: agents/orchestrator/agentcore/cdk/lib/cdk-stack.ts
-
-# Deploy Orchestrator
-cd agents/orchestrator && agentcore deploy -y
+cd agents/orchestrator/infra
+npm ci
+npm test
+npm run synth -- --profile your-profile --quiet
+# After configuring Identity and bootstrapping the account (see runbook):
+npm run deploy -- NewsAgent-Foundation --profile your-profile
+npm run deploy -- NewsAgent-Collector NewsAgent-Publisher --profile your-profile
+npm run deploy -- NewsAgent-Orchestrator --profile your-profile
 ```
 
 ### Manual Invocation
+
+For the new standalone CDK deployment, use runtime ARNs from CloudFormation outputs
+as described in the runbook. The following CLI shortcut requires populated/imported
+AgentCore CLI deployment state:
 
 ```bash
 cd agents/collector && agentcore invoke '{"task": {...}}' --stream

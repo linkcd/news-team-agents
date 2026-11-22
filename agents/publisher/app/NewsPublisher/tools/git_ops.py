@@ -17,6 +17,7 @@ import tempfile
 import git
 from bedrock_agentcore.identity import requires_api_key
 from strands import tool
+from config import publishing_enabled
 
 
 @requires_api_key(provider_name="github-token", into="api_key")
@@ -80,7 +81,7 @@ def write_new_post(repo_path: str, file_path: str, content: str) -> dict:
     try:
         full_path = os.path.join(repo_path, file_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, "w", encoding="utf-8") as f:
+        with open(full_path, "x", encoding="utf-8") as f:
             f.write(content)
         return {"status": "success"}
     except Exception as e:
@@ -102,11 +103,13 @@ def git_commit_and_push(repo_path: str, file_path: str, commit_message: str) -> 
     Returns:
         Dict with status, commit_sha, and error if any
     """
+    if not publishing_enabled():
+        return {"status": "success", "dry_run": True, "commit_sha": "", "file_path": file_path}
     try:
         repo = git.Repo(repo_path)
         repo.index.add([file_path])
         commit = repo.index.commit(commit_message)
-        repo.remote("origin").push()
+        repo.remote("origin").push().raise_if_error()
         return {"status": "success", "commit_sha": commit.hexsha}
     except Exception as e:
         return {"status": "error", "error": str(e), "commit_sha": ""}

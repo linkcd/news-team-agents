@@ -67,6 +67,8 @@ def _parse_post(content: str) -> dict:
                 source_urls = []
 
                 for line in item_lines[1:]:
+                    if line.strip().startswith(("*新闻来源:", "*最后更新:")):
+                        continue
                     if line.startswith("**来源**:"):
                         sources_match = re.search(
                             r"\*\*来源\*\*:\s*(.+?)\s*\|\s*\*\*最早报道\*\*:\s*(.+)",

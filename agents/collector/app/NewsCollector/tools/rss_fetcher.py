@@ -32,16 +32,15 @@ def _now():
 def _parse_published(entry) -> datetime | None:
     """Parse the published date from an RSS entry.
 
-    Uses the raw published string to extract the local time as reported by the source,
-    then treats it as a naive datetime for time-window comparison. This ensures consistent
-    filtering regardless of source timezone.
+    Normalize source timestamps to UTC without changing the represented instant.
     """
     raw = entry.get("published", "") or entry.get("updated", "")
     if raw:
         try:
             dt = parsedate_to_datetime(raw)
-            # Use the local time as-is (naive) for comparison against the time window
-            return dt.replace(tzinfo=timezone.utc)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
         except (TypeError, ValueError, OverflowError):
             logger.debug("Could not parse RSS date %r", raw, exc_info=True)
 

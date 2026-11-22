@@ -289,7 +289,7 @@ class TestConfigIntegration:
         from config import COLLECTOR_RUNTIME_ARN, PUBLISHER_RUNTIME_ARN, S3_BUCKET
 
         assert "newscollector" in COLLECTOR_RUNTIME_ARN
-        assert S3_BUCKET == "news-agent-data-example"
+        assert S3_BUCKET == "news-agent-test-data"
 
     def test_config_has_blog_settings(self):
         """Config has blog repo and branch."""

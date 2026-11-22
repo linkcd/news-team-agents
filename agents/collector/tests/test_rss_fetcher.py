@@ -44,7 +44,8 @@ def test_fetch_rss_returns_articles_within_time_window(sample_rss_xml):
 def test_fetch_rss_filters_old_articles(sample_rss_xml):
     from tools.rss_fetcher import fetch_rss
 
-    now = datetime(2026, 5, 21, 10, 0, 0, tzinfo=timezone.utc)
+    # 09:30 +0200 is 07:30 UTC; 08:00 +0200 is 06:00 UTC.
+    now = datetime(2026, 5, 21, 8, 0, 0, tzinfo=timezone.utc)
 
     with patch("tools.rss_fetcher.httpx") as mock_httpx:
         mock_response = MagicMock()

@@ -17,15 +17,16 @@ import time
 import httpx
 from bedrock_agentcore.identity import requires_api_key
 from strands import tool
-
-REPO = os.environ.get("BLOG_REPO", "")  # Must be set via environment variable (e.g., "owner/repo")
-WORKFLOW_FILE = "deploy.yml"
-API_BASE = f"https://api.github.com/repos/{REPO}" if REPO else ""
-
+from config import publishing_enabled
 
 @requires_api_key(provider_name="github-token", into="api_key")
 def _check_and_trigger(commit_sha: str, api_key: str = "") -> dict:
     """Check if deploy triggered for commit; dispatch workflow if not."""
+    repo = os.environ.get("BLOG_REPO", "")
+    if not repo:
+        return {"status": "error", "deploy_triggered": False, "error": "BLOG_REPO is required"}
+    api_base = f"https://api.github.com/repos/{repo}"
+    workflow = os.environ.get("BLOG_WORKFLOW", "deploy.yml")
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Accept": "application/vnd.github+json",
@@ -37,11 +38,14 @@ def _check_and_trigger(commit_sha: str, api_key: str = "") -> dict:
 
     # Check if any workflow run exists for this commit
     resp = httpx.get(
-        f"{API_BASE}/actions/runs",
+        f"{api_base}/actions/workflows/{workflow}/runs",
         headers=headers,
         params={"head_sha": commit_sha, "per_page": 5},
         timeout=15,
     )
+    if resp.status_code != 200:
+        return {"status": "error", "deploy_triggered": False,
+                "error": f"Failed to check deploy workflow: HTTP {resp.status_code}"}
     if resp.status_code == 200:
         runs = resp.json().get("workflow_runs", [])
         if runs:
@@ -56,9 +60,9 @@ def _check_and_trigger(commit_sha: str, api_key: str = "") -> dict:
 
     # No run found — trigger workflow_dispatch as fallback
     dispatch_resp = httpx.post(
-        f"{API_BASE}/actions/workflows/{WORKFLOW_FILE}/dispatches",
+        f"{api_base}/actions/workflows/{workflow}/dispatches",
         headers=headers,
-        json={"ref": "main"},
+        json={"ref": os.environ.get("BLOG_BRANCH", "main")},
         timeout=15,
     )
     if dispatch_resp.status_code == 204:
@@ -91,6 +95,8 @@ def verify_deploy(commit_sha: str) -> dict:
     Returns:
         Dict with status, deploy_triggered, and how it was triggered.
     """
+    if not publishing_enabled():
+        return {"status": "success", "dry_run": True, "deploy_triggered": False}
     try:
         return _check_and_trigger(commit_sha=commit_sha)
     except Exception as e:

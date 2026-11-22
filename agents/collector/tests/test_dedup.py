@@ -116,12 +116,16 @@ def test_get_dedup_context_s3_file():
 
 
 def test_get_dedup_context_handles_github_404():
+    import httpx
     from tools.dedup import get_dedup_context
 
     with patch("tools.dedup.httpx") as mock_httpx:
         mock_response = MagicMock()
         mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = Exception("404 Not Found")
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "404 Not Found", request=httpx.Request("GET", "https://example.com/missing"),
+            response=httpx.Response(404),
+        )
         mock_httpx.get.return_value = mock_response
 
         config = '{"type": "github_file", "repo": "example/blog", "path": "source/_posts/nonexistent.md"}'

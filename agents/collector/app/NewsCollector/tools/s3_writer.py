@@ -13,6 +13,7 @@
 
 import json
 import re
+from datetime import datetime, timezone
 
 import boto3
 from strands import tool
@@ -41,7 +42,7 @@ def _fix_unescaped_quotes(data: str) -> str:
     fixed_lines = []
     for line in lines:
         match = re.match(
-            r'^(\s*"(?:summary_zh|title_zh|changelog|title_original)":\s*")(.*)(",?)$',
+            r'^(\s*"(?:summary_zh|updated_summary_zh|title_zh|changelog|title_original)":\s*")(.*)(",?)$',
             line,
         )
         if match:
@@ -69,6 +70,21 @@ def write_to_s3(bucket: str, key: str, data: str) -> dict:
     """
     try:
         validated = _validate_and_fix_json(data)
+        parsed = json.loads(validated)
+        is_collection = isinstance(parsed, dict) and {"task_id", "new_items", "updated_items"} <= parsed.keys()
+        if is_collection:
+            if not isinstance(parsed["new_items"], list) or not isinstance(parsed["updated_items"], list):
+                raise ValueError("Collection items must be lists")
+            parsed["collected_at"] = datetime.now(timezone.utc).isoformat()
+            metadata = parsed.get("metadata") or {}
+            metadata.update({
+                "grouped_into_new_topics": len(parsed["new_items"]),
+                "matched_to_existing_topics": len(parsed["updated_items"]),
+                "new_items_count": len(parsed["new_items"]),
+                "updated_items_count": len(parsed["updated_items"]),
+            })
+            parsed["metadata"] = metadata
+            validated = json.dumps(parsed, ensure_ascii=False, indent=2)
     except (json.JSONDecodeError, ValueError) as e:
         return {"status": "error", "error": f"Invalid JSON: {e}", "key": key}
 
@@ -80,6 +96,9 @@ def write_to_s3(bucket: str, key: str, data: str) -> dict:
             Body=validated,
             ContentType="application/json",
         )
-        return {"status": "success", "key": key}
+        result = {"status": "success", "key": key}
+        if is_collection:
+            result.update({"task_id": parsed["task_id"], "data_key": key, "summary": parsed["metadata"]})
+        return result
     except Exception as e:
         return {"status": "error", "error": str(e), "key": key}

@@ -13,4 +13,9 @@
 
 import os
 
+
+def publishing_enabled() -> bool:
+    """Only an explicit runtime setting enables external publishing side effects."""
+    return os.environ.get("PUBLISHING_ENABLED", "false").lower() == "true"
+
 MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6")

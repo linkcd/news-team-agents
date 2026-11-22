@@ -26,6 +26,8 @@ Given a task, execute these steps IN ORDER:
 
 ### Step 1: Read Dedup Source
 Call get_dedup_context with the task's filters.dedup_source configuration (as JSON string).
+If it returns status "error", stop and return an error. Never treat an authentication
+or network failure as an empty dedup source.
 This gives you:
 - known_urls: URLs already collected (skip these)
 - existing_topics: Topics already published (match against these)
@@ -83,7 +85,9 @@ Call write_to_s3 with the configured bucket and key.
 The key should be: {s3_key_prefix}{task_id}.json
 
 ### Step 8: Return Result
-Return a summary to the caller:
+Return ONLY a JSON object to the caller, using the task_id, data_key and summary
+returned by write_to_s3. Do not add Markdown tables, commentary or a topic list.
+The write tool computes counts and collection time; do not guess or recalculate them:
 {
   "status": "success",
   "task_id": ...,

@@ -1,0 +1,24 @@
+{
+  "name": "news-agent-deployment",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "bootstrap:template": "npm run build && node dist/bootstrap.js",
+    "test": "npm run build && node --test test/*.test.cjs",
+    "synth": "npm run build && cdk synth",
+    "diff": "npm run build && cdk diff",
+    "deploy": "npm run build && cdk deploy"
+  },
+  "dependencies": {
+    "@aws/agentcore-cdk": "0.1.0-alpha.31",
+    "aws-cdk-lib": "2.265.0",
+    "constructs": "10.5.0"
+  },
+  "devDependencies": {
+    "yaml": "^2.8.2",
+    "@types/node": "^24.10.1",
+    "aws-cdk": "^2.1124.0",
+    "typescript": "~5.9.3"
+  }
+}

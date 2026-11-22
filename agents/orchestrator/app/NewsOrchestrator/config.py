@@ -12,6 +12,7 @@
 # limitations under the License.
 
 import os
+import re
 
 MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-6")
 AWS_REGION = os.environ.get("AWS_REGION", "eu-west-1")
@@ -28,7 +29,28 @@ PUBLISHER_RUNTIME_ARN = os.environ.get(
 S3_BUCKET = os.environ.get("S3_BUCKET", "")  # Must be set via environment variable
 
 BLOG_REPO = os.environ.get("BLOG_REPO", "")  # Must be set via environment variable (e.g., "owner/repo")
-BLOG_BRANCH = "main"
+BLOG_BRANCH = os.environ.get("BLOG_BRANCH", "main")
+
+
+def validate_configuration() -> None:
+    required = {
+        "COLLECTOR_RUNTIME_ARN": COLLECTOR_RUNTIME_ARN,
+        "PUBLISHER_RUNTIME_ARN": PUBLISHER_RUNTIME_ARN,
+        "S3_BUCKET": S3_BUCKET,
+        "BLOG_REPO": BLOG_REPO,
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        raise ValueError(f"Missing configuration: {', '.join(missing)}")
+    pattern = r"arn:aws:bedrock-agentcore:([^:]+):(\d{12}):runtime/[\w-]+"
+    collector = re.fullmatch(pattern, COLLECTOR_RUNTIME_ARN)
+    publisher = re.fullmatch(pattern, PUBLISHER_RUNTIME_ARN)
+    if not collector or not publisher:
+        raise ValueError("COLLECTOR_RUNTIME_ARN and PUBLISHER_RUNTIME_ARN must be runtime ARNs")
+    if collector[1] != AWS_REGION or publisher[1] != AWS_REGION:
+        raise ValueError("Runtime ARNs must match AWS_REGION")
+    if collector[2] != publisher[2]:
+        raise ValueError("Runtime ARNs must belong to the same account")
 
 NEWS_SOURCES = [
     {"url": "https://www.nrk.no/norge/toppsaker.rss", "type": "rss", "label": "NRK Norge", "category": "domestic"},

@@ -65,6 +65,13 @@ sys.modules["bedrock_agentcore.runtime.models"] = bedrock_agentcore_models_mock
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def publishing_configuration(monkeypatch):
+    # Unit tests mock Git/HTTP; tests of dry-run mode override this explicitly.
+    monkeypatch.setenv("PUBLISHING_ENABLED", "true")
+    monkeypatch.setenv("BLOG_REPO", "example/blog")
+
+
 @pytest.fixture
 def sample_collection_data():
     """Sample Collector output (S3 JSON) for publisher tests."""

@@ -110,3 +110,39 @@ def test_write_to_s3_rejects_unfixable_json():
 
     assert result["status"] == "error"
     assert "Invalid JSON" in result["error"]
+
+
+def test_collection_time_and_counts_are_computed_not_model_generated():
+    from datetime import datetime, timezone
+    from tools.s3_writer import write_to_s3
+
+    data = {"task_id": "test", "collected_at": "2099-01-01T00:00:00Z",
+            "new_items": [{"title_zh": "Topic"}], "updated_items": [],
+            "metadata": {"grouped_into_new_topics": 99, "new_items_count": 99}}
+    before = datetime.now(timezone.utc)
+    with patch("tools.s3_writer.boto3.client") as client:
+        result = write_to_s3("bucket", "key", json.dumps(data))
+    written = json.loads(client.return_value.put_object.call_args.kwargs["Body"])
+    assert before <= datetime.fromisoformat(written["collected_at"]) <= datetime.now(timezone.utc)
+    assert written["metadata"]["grouped_into_new_topics"] == 1
+    assert written["metadata"]["new_items_count"] == 1
+    assert result["summary"]["matched_to_existing_topics"] == 0
+
+
+def test_write_to_s3_repairs_quotes_in_updated_topic_summaries():
+    from tools.s3_writer import write_to_s3
+
+    data = '''{
+      "task_id": "update-test",
+      "new_items": [],
+      "updated_items": [{
+        "match_title_zh": "既有主题",
+        "updated_summary_zh": "声明称谈判已经\"正式失败\"。"
+      }],
+      "metadata": {}
+    }'''
+    with patch("tools.s3_writer.boto3.client") as client:
+        result = write_to_s3("bucket", "key", data)
+    assert result["status"] == "success"
+    written = json.loads(client.return_value.put_object.call_args.kwargs["Body"])
+    assert written["updated_items"][0]["updated_summary_zh"] == '声明称谈判已经"正式失败"。'

@@ -1,0 +1,8 @@
+{
+  "app": "node dist/app.js",
+  "context": {
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/core:target-partitions": ["aws"],
+    "@aws-cdk/aws-lambda:useCdkManagedLogGroup": true
+  }
+}

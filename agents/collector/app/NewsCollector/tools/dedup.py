@@ -13,16 +13,26 @@
 
 import json
 import re
+from html import unescape
 
 import boto3
 import httpx
+from httpx import HTTPStatusError
 from bedrock_agentcore.identity import requires_api_key
 from strands import tool
 
 
+def _markdown_urls(markdown: str) -> list[str]:
+    # Jinja escapes URL ampersands in Markdown. Only decode complete entities,
+    # preserving raw query parameters such as '&not=...' in legacy posts.
+    return [re.sub(r'&(?:#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);',
+                   lambda match: unescape(match.group()), url)
+            for url in re.findall(r'\[.*?\]\((https?://[^\)]+)\)', markdown)]
+
+
 def _parse_markdown_topics(markdown: str) -> tuple[list[str], list[dict]]:
     """Parse a blog post markdown to extract URLs and topic summaries."""
-    urls = re.findall(r'\[.*?\]\((https?://[^\)]+)\)', markdown)
+    urls = _markdown_urls(markdown)
 
     topics = []
     sections = re.split(r'###\s+\d+\.\s+', markdown)
@@ -33,14 +43,17 @@ def _parse_markdown_topics(markdown: str) -> tuple[list[str], list[dict]]:
         summary_lines = []
         past_source = False
         for line in lines[1:]:
-            if line.strip().startswith("来源:") or line.strip().startswith("来源："):
+            stripped = line.strip()
+            if re.match(r"^(?:\*\*)?来源(?:\*\*)?[:：]", stripped):
                 past_source = True
                 continue
-            if past_source and line.strip():
-                summary_lines.append(line.strip())
+            if stripped.startswith(("原文链接:", "原文链接：", "## ", "*新闻来源:", "*最后更新:")) or stripped == "---":
+                break
+            if past_source and stripped:
+                summary_lines.append(stripped)
 
         summary = "\n".join(summary_lines)
-        source_urls = re.findall(r'\[.*?\]\((https?://[^\)]+)\)', section)
+        source_urls = _markdown_urls(section)
 
         topics.append(
             {"title": title, "summary": summary, "source_urls": source_urls}
@@ -114,8 +127,12 @@ def get_dedup_context(dedup_config: str) -> dict:
         try:
             result = _fetch_github_file(repo=repo, path=path)
             content = result["content"]
-        except Exception:
-            return {"status": "success", "known_urls": [], "existing_topics": []}
+        except HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                return {"status": "success", "known_urls": [], "existing_topics": []}
+            return {"status": "error", "error": str(exc), "known_urls": [], "existing_topics": []}
+        except Exception as exc:
+            return {"status": "error", "error": str(exc), "known_urls": [], "existing_topics": []}
 
         if not content:
             return {"status": "success", "known_urls": [], "existing_topics": []}

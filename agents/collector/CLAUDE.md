@@ -4,6 +4,10 @@ A general-purpose web content collection agent. Given a set of URLs (or RSS feed
 
 ## Deployment
 
+For the new account <AWS_ACCOUNT_ID>, use `../orchestrator/infra/` and the root
+`doc/account-migration.md` runbook. The identifiers and `agentcore deploy` examples
+below are for the legacy deployment in account <AWS_ACCOUNT_ID>.
+
 - **Runtime ID**: `<RUNTIME_ID>`
 - **ARN**: `arn:aws:bedrock-agentcore:eu-west-1:<AWS_ACCOUNT_ID>:runtime/<RUNTIME_ID>`
 - **Protocol**: A2A (Agent-to-Agent) via `serve_a2a(StrandsA2AExecutor(agent, enable_a2a_compliant_streaming=False))`

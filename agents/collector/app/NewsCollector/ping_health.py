@@ -23,3 +23,30 @@ def make_ping_handler(lock: threading.Lock):
         return PingStatus.HEALTHY
 
     return ping_handler
+
+
+def make_agent_ping_handler(agent):
+    """Track invocation health through public SDK hooks, not private agent locks."""
+    from strands.hooks import BeforeInvocationEvent, AfterInvocationEvent
+
+    state_lock = threading.Lock()
+    busy_lock = threading.Lock()
+    active = 0
+
+    def started(event):
+        nonlocal active
+        with state_lock:
+            active += 1
+            if active == 1:
+                busy_lock.acquire()
+
+    def finished(event):
+        nonlocal active
+        with state_lock:
+            active = max(0, active - 1)
+            if active == 0 and busy_lock.locked():
+                busy_lock.release()
+
+    agent.hooks.add_callback(BeforeInvocationEvent, started)
+    agent.hooks.add_callback(AfterInvocationEvent, finished)
+    return make_ping_handler(busy_lock)

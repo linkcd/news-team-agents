@@ -14,7 +14,7 @@
 from strands import Agent
 from strands.models import BedrockModel
 
-from config import MODEL_ID, S3_BUCKET, BLOG_REPO, NEWS_SOURCES
+from config import MODEL_ID, S3_BUCKET, BLOG_REPO, BLOG_BRANCH, NEWS_SOURCES, validate_configuration
 from tools import invoke_collector, invoke_publisher, verify_agents
 
 SYSTEM_PROMPT = """You are a workflow orchestration agent for Norwegian news collection and publishing.
@@ -35,7 +35,7 @@ From the trigger payload, extract:
 - date: today's date (YYYY-MM-DD format)
 - time_label: HHMM from run_time (e.g. "1100")
 - post_path: source/_posts/YYYYMMDD-norway.md
-- is_first_run: true if this is the first run of the day (05:00 UTC), false otherwise
+- Always deduplicate against today's GitHub post, including the 05:00 run and migration/retry runs.
 
 ### Step 2: Build Collector Task Config
 Construct the task configuration for the Collector agent:
@@ -43,7 +43,7 @@ Construct the task configuration for the Collector agent:
 - sources: ALL 11 Norwegian RSS feeds (passed from config in your tools)
 - filters:
   - time_window_hours: 6
-  - dedup_source: {"type": "github_file", "repo": "BLOG_REPO_PLACEHOLDER", "path": "{post_path}"} if NOT first run, else {"type": "none"}
+  - dedup_source: {"type": "github_file", "repo": "BLOG_REPO_PLACEHOLDER", "path": "{post_path}"}
 - processing:
   - extract_full_content: true
   - consolidate_topics: true
@@ -71,16 +71,12 @@ Check the collection summary:
 ### Step 5: Build Publisher Task Config
 Construct the task configuration for the Publisher agent:
 - task_id: "publish-norway-{date}-{time_label}"
-- type: "publish_new" if is_first_run, else "merge_update"
+- type: "publish" (Publisher's prepare_post tool chooses publish_new vs merge_update by file existence)
 - source: {"type": "s3", "bucket": "NEWS_AGENT_S3_BUCKET_PLACEHOLDER", "key": "{data_key from collector result}"}
 - template: "norway_daily"
 
-If type is "publish_new":
-- output: {"repo": "BLOG_REPO_PLACEHOLDER", "branch": "main", "file_path": "{post_path}", "commit_message": "Add Norway news {date}"}
-- editorial: {"generate_summary": true, "summary_word_count": 300, "summary_scope": "all_items"}
-
-If type is "merge_update":
-- target: {"repo": "BLOG_REPO_PLACEHOLDER", "branch": "main", "file_path": "{post_path}"}
+- target: {"repo": "BLOG_REPO_PLACEHOLDER", "branch": "BLOG_BRANCH_PLACEHOLDER", "file_path": "{post_path}"}
+- commit_message: "Update Norway news {date} {time_label}"
 - merge_strategy: {"new_items": "prepend_per_section", "updated_items": "replace_summary_and_add_source", "renumber": true, "regenerate_day_summary": true}
 - editorial: {"generate_summary": true, "summary_word_count": 300, "summary_scope": "all_items"}
 
@@ -89,6 +85,7 @@ Call invoke_publisher with the task config.
 - Do NOT retry on error (git state may be inconsistent).
 - If error: return failure result.
 - If success: proceed to Step 7.
+- If Publisher returns dry_run=true, include dry_run=true in your result and do not claim publication.
 
 ### Step 7: Return Result
 Return a JSON result with this structure:
@@ -114,17 +111,19 @@ Return a JSON result with this structure:
 2. The Collector handles: RSS fetching, dedup, topic consolidation, translation, S3 write.
 3. The Publisher handles: reading from S3, formatting, merging, git push.
 4. You handle: workflow decisions, retry logic, config building.
-5. First run of day is the 05:00 UTC run. All other runs (11:00, 17:00, 23:00) are subsequent runs.
-6. For subsequent runs, use github_file dedup so the Collector can match against existing topics in today's post.
+5. Never infer post existence from the schedule. Publisher determines it from the cloned repository.
+6. Always use github_file dedup so Collector can match existing topics, even during migration or replay.
 """
 
 
 def create_agent() -> Agent:
     import json
+    validate_configuration()
     model = BedrockModel(model_id=MODEL_ID)
     sources_json = json.dumps(NEWS_SOURCES, indent=2)
     prompt = SYSTEM_PROMPT.replace("NEWS_AGENT_S3_BUCKET_PLACEHOLDER", S3_BUCKET)
     prompt = prompt.replace("BLOG_REPO_PLACEHOLDER", BLOG_REPO)
+    prompt = prompt.replace("BLOG_BRANCH_PLACEHOLDER", BLOG_BRANCH)
     prompt += f"\n\n## CONFIGURATION VALUES\n\n- S3 bucket: `{S3_BUCKET}`\n- Blog repository: `{BLOG_REPO}`\n- News sources (pass ALL of these to the Collector):\n```json\n{sources_json}\n```\n"
     return Agent(
         name="NewsOrchestrator",
